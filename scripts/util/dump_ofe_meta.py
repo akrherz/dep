@@ -14,7 +14,7 @@ def main():
     with get_sqlalchemy_conn("idep") as conn:
         meta = pd.read_sql(
             sql_helper("""
-    with soilstuff as (
+    with pop as (
         SELECT MU.mukey::int as mukey
              ,C.cokey
              ,C.compname
@@ -33,6 +33,8 @@ def main():
              ,hrz.ksat_r as hydro_conduct
              ,coalesce(hrz.cec7_r, hrz.ecec_r) as cec
              ,hrz.om_r as organic_matter
+              , ROW_NUMBER() OVER (PARTITION BY MU.mukey
+                ORDER BY C.comppct_r desc) as rowNbr
 
         FROM gssurgo24.MAPUNIT MU left join gssurgo24.component C ON
                        MU.mukey = C.mukey
@@ -41,7 +43,10 @@ def main():
            LEFT JOIN gssurgo24.chtexture txt ON txt.chtgkey = tgrp.chtgkey
 
         WHERE  C.majcompflag = 'Yes' and hrz.hzdept_r = 0
-                       )
+                       ),
+        soilstuff as (
+            select * from pop where rowNbr = 1
+        )
 
                 select huc_12, fpath as flowpath, ofe,
                 st_x(st_pointn(st_transform(o.geom, 4326), 1)) as lon,
