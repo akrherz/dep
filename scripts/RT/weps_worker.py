@@ -139,7 +139,7 @@ none
 #   RFD-SoilFile
 Bearden_I119A_70_SICL.ifc
 #   RFD-ManageFile
-corn_soybean_3high_mulch.man
+weps.man
 #
 # --WEPS OUTPUT OPTIONS
 #   RFD-OutputFile
@@ -224,9 +224,11 @@ def run_weps(payload: WEPSJobPayload) -> None:
             payload.windfile = "/i/0/wind/zeros.win"
 
         shutil.copyfile(payload.windfile, Path(tmpdir) / "interpolated.win")
+        shutil.copyfile(payload.manfile, Path(tmpdir) / "weps.man")
+
+        # we are left with the hardcoded soil :/
         for hack in [
             "Bearden_I119A_70_SICL.ifc",
-            "corn_soybean_3high_mulch.man",
         ]:
             shutil.copyfile(f"/i/0/weps_test/{hack}", Path(tmpdir) / hack)
         cmd = [

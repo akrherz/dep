@@ -112,6 +112,10 @@ def main(
             wepsexe="weps_dep",
             for_sweep=for_sweep,
             windfile=windfile,
+            manfile=(
+                f"/i/0/weps_man/{row.huc_12[:8]}/{row.huc_12[8:]}/"
+                f"{row.huc_12}_{row.fpath}.man"
+            ),
             field_id=row.field_id,
             fpath=row.fpath,
             huc_12=row.huc_12,
