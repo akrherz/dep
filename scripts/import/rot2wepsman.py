@@ -65,7 +65,8 @@ def do_flowpath(
                 except KeyError:
                     continue
             outfh.write(
-                f"D {int(day):02.0f}/{int(month):02.0f}/{int(year):02.0f}\n"
+                f"D {int(day):02.0f}/{int(month):02.0f}/"
+                f"{int(year) + 2006:02.0f}\n"
             )
             outfh.write(payload + "\n#----\n")
         outfh.write("*END\n*EOF")
@@ -98,7 +99,9 @@ def main(scenario: int):
             sql_helper("""
         SELECT fpath, huc_12 from flowpaths f JOIN flowpath_ofes o
         on (f.fid = o.flowpath)
-        WHERE f.scenario = :scenario and strpos(landuse, 'C') > 0
+        WHERE f.scenario = :scenario and (
+        strpos(landuse, 'C') > 0 or strpos(landuse, 'B') > 0
+        )
         ORDER by huc_12 ASC
             """),
             pgconn,

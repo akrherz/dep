@@ -37,6 +37,7 @@ LOG = logger()
 MEMORY = {
     "runs": 0,
     "timestamp": time.time(),
+    "save_runfile": False,
 }
 BINPATH = Path("/opt/dep/bin")
 
@@ -93,7 +94,9 @@ def process_erod(huc_12: str, fpath: int, tmpdir, simulation_day):
 DAY1 = date(2007, 1, 1)
 
 
-def generate_runfile(lon: float, lat: float):
+def generate_runfile(
+    lon: float, lat: float, clifile: str, windfile: str, manfile: str
+) -> str:
     """Create the run file settings."""
     return f"""
 #VERSION=1.05
@@ -105,7 +108,7 @@ def generate_runfile(lon: float, lat: float):
 #   RFD-UserName
 Exercise 1
 #   FarmId TractId FieldId runtypedisp RotationYears CycleCount
- |  |  | NRCS | 2 | 10
+ |  |  | NRCS | 20 | 1
 #   RFD-Site
 FIPS:US-WI-097
 #
@@ -131,15 +134,15 @@ test2
 #
 # --RUN FILE FILENAMES (INPUT)
 #   RFD-climate file
-weps.cli
+{clifile}
 #   RFD-wind file
-interpolated.win
+{windfile}
 #   RFD-sub-daily file
 none
 #   RFD-SoilFile
 Bearden_I119A_70_SICL.ifc
 #   RFD-ManageFile
-weps.man
+{manfile}
 #
 # --WEPS OUTPUT OPTIONS
 #   RFD-OutputFile
@@ -214,17 +217,17 @@ def run_weps(payload: WEPSJobPayload) -> None:
     """
     simulation_day = (payload.dt - DAY1).days + 1
     with TemporaryDirectory() as tmpdir:
-        runfile = generate_runfile(payload.lon, payload.lat)
+        clifile = Path(payload.clifile)
+        windfile = Path(payload.windfile)
+        manfile = Path(payload.manfile)
+        runfile = generate_runfile(
+            payload.lon, payload.lat, clifile.name, windfile.name, manfile.name
+        )
         with open(Path(tmpdir) / "weps.run", "w") as fh:
             fh.write(runfile)
-        shutil.copyfile(payload.clifile, Path(tmpdir) / "weps.cli")
-        # We bring in a wind file that is all zeros, hopefully this works
-        # without messing up the soil state.
-        if payload.for_sweep:
-            payload.windfile = "/i/0/wind/zeros.win"
-
-        shutil.copyfile(payload.windfile, Path(tmpdir) / "interpolated.win")
-        shutil.copyfile(payload.manfile, Path(tmpdir) / "weps.man")
+        shutil.copyfile(clifile, Path(tmpdir) / clifile.name)
+        shutil.copyfile(windfile, Path(tmpdir) / windfile.name)
+        shutil.copyfile(manfile, Path(tmpdir) / manfile.name)
 
         # we are left with the hardcoded soil :/
         for hack in [
@@ -256,6 +259,15 @@ def run_weps(payload: WEPSJobPayload) -> None:
                 encoding="utf-8",
                 errors="replace",
             )
+            if MEMORY["save_runfile"]:
+                savefn = (
+                    Path("/i/0/weps")
+                    / payload.huc_12[:8]
+                    / payload.huc_12[8:]
+                    / f"{payload.huc_12}_{payload.fpath}.run"
+                )
+                savefn.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(Path(tmpdir) / "weps.run", savefn)
             if not payload.for_sweep:
                 plotfn = Path(tmpdir) / "plot.out"
                 savefn = (
@@ -366,13 +378,20 @@ def print_timing():
     type=int,
     help="Maximum unacknowledged jobs to reserve per worker process",
 )
+@click.option(
+    "--save-runfile",
+    is_flag=True,
+    help="Save the generated input file for future usage.",
+)
 def main(
     workers: int,
     drainme: bool,
     queue: str,
     prefetch_count: int | None,
+    save_runfile: bool,
 ):
     """Go main Go."""
+    MEMORY["save_runfile"] = save_runfile
     jobfunc = run if not drainme else drain
     if prefetch_count is None:
         prefetch_count = workers
