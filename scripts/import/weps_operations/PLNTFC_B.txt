@@ -1,0 +1,42 @@
+O 03 Planter, sprig, no-till
++ 3.7415698 0.52 2.2351363 0.0 2.2351363 1.3410819 2.6821637
+T Begin growth, sprigs are planted with little soil disturbance, also use for manual sprigging.User inputs: crop/grass type, target yield
+t Planter used to plant sprigs.  Similar to a light finishing disk 11-14-02 DTLLMOD and WEPS update correlation; new WEPS operation record, as previous translate,Planter, sprig, no-till|rename|Planter, sprig conventional, 160410 jkp
++
+G 01 Tillage
++ 50.800102 0.5 0.05 50.800102 25.400051 76.20015
+P 01 Break Crust
+P 02 Random Roughness
++ 1 15.240031
+P 05 Ridges and Dikes
++ 1 25.400051 609.6012 508.001 0.0 0.0
+P 11 Aggregate Crushing
++ 2.4 2.0
+P 12 Soil Loosening
++ 0.8
+P 13 Soil Layer Mixing
++ 0.25
+P 24 Flatten Standing Biomass
++ 0 0.85 0.7 0.6 0.5 1.0
+P 25 Bury Flat Biomass
++ 1 .73 0.63 .55 .4 .73
+P 26 Resurface Buried Biomass
++ 0.02 0.04 0.02 0.05 0.02
+P 34 Change Standing Biomass Fall Rate
++ 7 3.0 2.5 2.0 1.5 1.0
++ 0.5 0.6 0.7 0.8 1.0
+G 03 Crop Name
++ Soybean, grain
+P 51 Seeding Configuration
++ 1 0.0 2
++ 27.0 1.0 1 45 1.0 1.0 0
++ bu/ac
++ 13 148.7 1 0.8 0.65 .8
++ 1.5 0.05 1.5240185 10.0 25.0 0 100 1200.0
++ -5.0 -15.0 0.01 0.95 0.0 25.0
++ 0.023 0.8063 0.4146 -0.061 -0.024 0.9911 0.6435 0.0494
++ 0.4146 -0.061 2.83 1.0 26.0 0.05 0 0.5
++ 111.111115 111.111115 1.5 0.015 0.0 0.0 0.0 1
++ 0.03 0.03 0.03 0.03 0.2 0.01 20.0 5.227942
++ -1.20379 0.604887 1.34 0.0313838 0.0 0.0 0.0 0.0
+T Annual, broadleaf, warm season, grain production,suggest harvest oprn: Harvest, killing crop with percent standing stubble,

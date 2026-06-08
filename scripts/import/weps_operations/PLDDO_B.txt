@@ -1,0 +1,44 @@
+O 03 Planter, double disk opnr
++ 4.1157265 2.4375 2.2351363 0.0 2.2351363 1.5645955 2.9056773
+T Begin growth, double disk opener on 30 in spacing.User inputs: crop and target yield
+t This is a standard planter on 30 in sp with a 1 in ridge.  Created in RUSLE 6/7/01.  MAS 8/7/07G2 was added into file in front of the flattening (P24), burial (P25), and resurfacing (P26) factors because the area affected is less than 1.0 andthe RUSLE values were normalized to 1.0.  This change will imulate the correct residue changes based on the method set forth in RUSLE.RUSLE's factors have been redused to based on the area affected.The stalk fall rate factor (P34) was moved ahead of the new (G2) factor to set the fall rate to the less than 1.0 area affected.  8/7/07 MASLMOD and WEPS update correlation; existing WEPS operation record, 160410 jkp
++
+G 01 Tillage
++ 63.500126 0.4 .15 63.500126 50.800102 101.600204
+P 01 Break Crust
+P 02 Random Roughness
++ 1 10.160021
+P 05 Ridges and Dikes
++ 1 50.800102 762.0015 635.0013 0.0 0.0
+P 11 Aggregate Crushing
++ 2.8 0.75
+P 12 Soil Loosening
++ 0.6
+P 13 Soil Layer Mixing
++ 0.35
+P 34 Change Standing Biomass Fall Rate
++ 7 3.0 2.5 2.0 1.5 1.0
++ 0.5 0.6 0.7 0.8 1.0
+G 02 Biomass Manipulation
++ 1.0
+P 24 Flatten Standing Biomass
++ 0 .3 .25 .2 0.1 1.0
+P 25 Bury Flat Biomass
++ 1 .0525 0.0375 .03 .015 .03
+P 26 Resurface Buried Biomass
++ .01 .01 .01 .02 .01
+G 03 Crop Name
++ Soybean, grain
+P 51 Seeding Configuration
++ 1 0.0 2
++ 27.0 1.0 1 45 1.0 1.0 0
++ bu/ac
++ 13 148.7 1 0.8 0.65 .8
++ 1.5 0.05 1.5240185 10.0 25.0 0 100 1200.0
++ -5.0 -15.0 0.01 0.95 0.0 25.0
++ 0.023 0.8063 0.4146 -0.061 -0.024 0.9911 0.6435 0.0494
++ 0.4146 -0.061 2.83 1.0 26.0 0.05 0 0.5
++ 111.111115 111.111115 1.5 0.015 0.0 0.0 0.0 1
++ 0.03 0.03 0.03 0.03 0.2 0.01 20.0 5.227942
++ -1.20379 0.604887 1.34 0.0313838 0.0 0.0 0.0 0.0
+T Annual, broadleaf, warm season, grain production,suggest harvest oprn: Harvest, killing crop with percent standing stubble,

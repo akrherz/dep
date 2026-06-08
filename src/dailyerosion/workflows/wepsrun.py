@@ -29,6 +29,9 @@ class WEPSJobPayload(BaseModel):
             )
         ),
     ]
+    manfile: Annotated[
+        str, Field(description="WEPS formatted management file.")
+    ]
     huc_12: Annotated[str, Field(description="HUC12 code")]
     clifile: Annotated[str, Field(description="DEP breakpoint CLI file")]
     scenario: Annotated[int, Field(description="Scenario ID")] = 0

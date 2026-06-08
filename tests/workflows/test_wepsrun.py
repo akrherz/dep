@@ -9,6 +9,7 @@ def test_wepsjobpayload_valid():
         wepsexe="wepp20240930",
         for_sweep=False,
         windfile="/dev/null",
+        manfile="",
         huc_12="123456789012",
         clifile="/dev/null",
         scenario=0,
