@@ -11,7 +11,6 @@ import click
 import pandas as pd
 from pyiem.database import get_sqlalchemy_conn, sql_helper
 from pyiem.util import logger
-from sqlalchemy.engine import Connection
 from tqdm import tqdm
 
 from dailyerosion.util import load_scenarios
@@ -20,7 +19,6 @@ LOG = logger()
 
 
 def do_flowpath(
-    conn: Connection,
     scenario: int,
     weps_operations: dict[str, str],
     metadata: dict,
@@ -79,18 +77,8 @@ def get_flowpath_scenario(scenario):
     return int(sdf.at[scenario, "flowpath_scenario"])
 
 
-def workflow(conn: Connection, scenario: int):
+def workflow(df: pd.DataFrame, scenario: int):
     """Go main go"""
-    df = pd.read_sql(
-        sql_helper("""
-    SELECT fpath, huc_12 from flowpaths f JOIN flowpath_ofes o
-    on (f.fid = o.flowpath)
-    WHERE f.scenario = :scenario and strpos(landuse, 'C') > 0
-    ORDER by huc_12 ASC
-        """),
-        conn,
-        params={"scenario": get_flowpath_scenario(scenario)},
-    )
     progress = tqdm(df.iterrows(), total=len(df.index))
     weps_operations = {}
     for fn in glob.glob("weps_operations/*.txt"):
@@ -98,7 +86,7 @@ def workflow(conn: Connection, scenario: int):
             weps_operations[fn.split("/")[1][:-4]] = fh.read().strip()
     for _idx, row in progress:
         progress.set_description(f"{row['huc_12']} {row['fpath']:04.0f}")
-        do_flowpath(conn, scenario, weps_operations, row)
+        do_flowpath(scenario, weps_operations, row)
 
 
 @click.command()
@@ -106,7 +94,18 @@ def workflow(conn: Connection, scenario: int):
 def main(scenario: int):
     """Go main go"""
     with get_sqlalchemy_conn("idep") as pgconn:
-        workflow(pgconn, scenario)
+        df = pd.read_sql(
+            sql_helper("""
+        SELECT fpath, huc_12 from flowpaths f JOIN flowpath_ofes o
+        on (f.fid = o.flowpath)
+        WHERE f.scenario = :scenario and strpos(landuse, 'C') > 0
+        ORDER by huc_12 ASC
+            """),
+            pgconn,
+            params={"scenario": get_flowpath_scenario(scenario)},
+        )
+
+    workflow(df, scenario)
 
 
 if __name__ == "__main__":
