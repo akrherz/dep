@@ -102,7 +102,8 @@ def main(
     # This is idempotent - safe to declare multiple times
     channel.queue_declare(queue=queue, durable=True)
     sts = datetime.now()
-    windfile = ""
+    # When we are for_sweep mode, we hopefully do not need real wind data
+    windfile = "/i/0/wind/zeros.win"
 
     for row in fieldsdf.itertuples():
         if not for_sweep:

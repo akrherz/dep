@@ -218,11 +218,6 @@ def run_weps(payload: WEPSJobPayload) -> None:
         with open(Path(tmpdir) / "weps.run", "w") as fh:
             fh.write(runfile)
         shutil.copyfile(payload.clifile, Path(tmpdir) / "weps.cli")
-        # We bring in a wind file that is all zeros, hopefully this works
-        # without messing up the soil state.
-        if payload.for_sweep:
-            payload.windfile = "/i/0/wind/zeros.win"
-
         shutil.copyfile(payload.windfile, Path(tmpdir) / "interpolated.win")
         shutil.copyfile(payload.manfile, Path(tmpdir) / "weps.man")
 
