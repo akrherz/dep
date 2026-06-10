@@ -2,6 +2,7 @@
 
 import time
 from datetime import datetime
+from pathlib import Path
 
 import click
 import httpx
@@ -61,12 +62,13 @@ def main(date: datetime, scenario: int, myhucs: str | None, queue: str):
         select o.field_id,
         row_number() over (partition by field_id ORDER by fpath asc),
         substr(o.landuse, :charat, 1) as crop, f.fpath, h.huc_12,
-        st_pointn(st_transform(o.geom, 4326), 1) as pt
-        from flowpath_ofes o, flowpaths f, huc12 h
+        st_pointn(st_transform(o.geom, 4326), 1) as pt, g.mukey
+        from flowpath_ofes o, flowpaths f, huc12 h, gssurgo g
         where o.flowpath = f.fid and f.huc_12 = h.huc_12 and
         (h.states ~* 'MN' or h.huc_12 = ANY(:graphhucs))
-        and f.scenario = 0 and o.ofe = 1)
-    select field_id, fpath, huc_12, st_x(pt) as lon, st_y(pt) as lat, crop
+        and f.scenario = 0 and o.ofe = 1 and o.gssurgo_id = g.id)
+    select field_id, fpath, huc_12, st_x(pt) as lon, st_y(pt) as lat, crop,
+    mukey
     from data
     where row_number = 1 and crop in ('C', 'B') {huclimit}
         """,
@@ -90,10 +92,14 @@ def main(date: datetime, scenario: int, myhucs: str | None, queue: str):
     sts = datetime.now()
 
     for row in fieldsdf.itertuples():
+        ifcfile = Path(f"/i/0/weps_soil_fy2025/{row.mukey}.ifc")
+        if not ifcfile.exists():
+            ifcfile = Path("/i/0/weps_test/Bearden_I119A_70_SICL.ifc")
         payload = SweepJobPayload(
             sweepexe="sweep_dep",
             field_id=row.field_id,
             fpath=row.fpath,
+            ifcfile=str(ifcfile),
             huc_12=row.huc_12,
             crop=row.crop,
             dt=dt,

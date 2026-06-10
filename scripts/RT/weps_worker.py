@@ -95,7 +95,12 @@ DAY1 = date(2007, 1, 1)
 
 
 def generate_runfile(
-    lon: float, lat: float, clifile: str, windfile: str, manfile: str
+    lon: float,
+    lat: float,
+    clifile: str,
+    windfile: str,
+    manfile: str,
+    ifcfile: str,
 ) -> str:
     """Create the run file settings."""
     return f"""
@@ -140,7 +145,7 @@ test2
 #   RFD-sub-daily file
 none
 #   RFD-SoilFile
-Bearden_I119A_70_SICL.ifc
+{ifcfile}
 #   RFD-ManageFile
 {manfile}
 #
@@ -220,20 +225,22 @@ def run_weps(payload: WEPSJobPayload) -> None:
         clifile = Path(payload.clifile)
         windfile = Path(payload.windfile)
         manfile = Path(payload.manfile)
+        ifcfile = Path(payload.ifcfile)
         runfile = generate_runfile(
-            payload.lon, payload.lat, clifile.name, windfile.name, manfile.name
+            payload.lon,
+            payload.lat,
+            clifile.name,
+            windfile.name,
+            manfile.name,
+            ifcfile.name,
         )
         with open(Path(tmpdir) / "weps.run", "w") as fh:
             fh.write(runfile)
         shutil.copyfile(clifile, Path(tmpdir) / clifile.name)
         shutil.copyfile(windfile, Path(tmpdir) / windfile.name)
         shutil.copyfile(manfile, Path(tmpdir) / manfile.name)
+        shutil.copyfile(ifcfile, Path(tmpdir) / ifcfile.name)
 
-        # we are left with the hardcoded soil :/
-        for hack in [
-            "Bearden_I119A_70_SICL.ifc",
-        ]:
-            shutil.copyfile(f"/i/0/weps_test/{hack}", Path(tmpdir) / hack)
         cmd = [
             sanitize_exe(BINPATH / payload.wepsexe),
             "-c0",  # no soil conditioning output

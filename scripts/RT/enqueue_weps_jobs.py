@@ -13,6 +13,7 @@ Division of Labor
 
 import time
 from datetime import datetime
+from pathlib import Path
 
 import click
 import httpx
@@ -74,13 +75,15 @@ def main(
         select o.field_id,
         row_number() over (partition by field_id ORDER by fpath asc),
         substr(o.landuse, :charat, 1) as crop, f.fpath, h.huc_12,
-        st_pointn(st_transform(o.geom, 4326), 1) as pt, c.filepath as clifile
-        from flowpath_ofes o, flowpaths f, huc12 h, climate_files c
+        st_pointn(st_transform(o.geom, 4326), 1) as pt, c.filepath as clifile,
+        g.mukey
+        from flowpath_ofes o, flowpaths f, huc12 h, climate_files c, gssurgo g
         where o.flowpath = f.fid and f.huc_12 = h.huc_12 and
         (h.states ~* 'MN' or h.huc_12 = ANY(:graphhucs))
-        and f.scenario = 0 and o.ofe = 1 and f.climate_file_id = c.id)
+        and f.scenario = 0 and o.ofe = 1 and f.climate_file_id = c.id
+        and o.gssurgo_id = g.id)
     select field_id, fpath, huc_12, st_x(pt) as lon, st_y(pt) as lat, crop,
-    clifile from data
+    clifile, mukey from data
     where row_number = 1 and crop in ('C', 'B') {huclimit}
         """,
                 huclimit=" and huc_12 = ANY(:hucs)" if myhucs else "",
@@ -109,6 +112,9 @@ def main(
         if not for_sweep:
             gid = f"{get_gid(row.lon, row.lat):06.0f}"
             windfile = f"/i/0/wind/{gid[:3]}/{gid}.win"
+        ifcfile = Path(f"/i/0/weps_soil_fy2025/{row.mukey}.ifc")
+        if not ifcfile.exists():
+            ifcfile = Path("/i/0/weps_test/Bearden_I119A_70_SICL.ifc")
         payload = WEPSJobPayload(
             wepsexe="weps_dep",
             for_sweep=for_sweep,
@@ -117,6 +123,7 @@ def main(
                 f"/i/0/weps_man/{row.huc_12[:8]}/{row.huc_12[8:]}/"
                 f"{row.huc_12}_{row.fpath}.man"
             ),
+            ifcfile=str(ifcfile),
             field_id=row.field_id,
             fpath=row.fpath,
             huc_12=row.huc_12,

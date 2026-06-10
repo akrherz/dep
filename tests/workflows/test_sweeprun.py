@@ -11,6 +11,7 @@ def test_sweepjobpayload_valid():
         sweepexe="sweep20240930",
         huc_12="123456789012",
         clifile="/dev/null",
+        ifcfile="/dev/null",
         scenario=0,
         field_id=1,
         fpath=1,

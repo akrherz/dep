@@ -151,9 +151,7 @@ def run_sweep(tempdir: str, payload: SweepJobPayload) -> SweepJobResult | None:
     # hacks again
     sci_ifc = root.find("./SCI_Subregions/SCI_Subregion/GUI_soilifc")
     sci_ifc.text = "sweep.ifc"
-    shutil.copyfile(
-        "/i/0/weps_test/Bearden_I119A_70_SICL.ifc", f"{tempdir}/sweep.ifc"
-    )
+    shutil.copyfile(payload.ifcfile, f"{tempdir}/sweep.ifc")
     shutil.copyfile("/i/0/weps_test/erod.grdx", f"{tempdir}/erod.grdx")
     grdnode = root.find("./SCI_GridFile")
     grdnode.text = "erod.grdx"

@@ -5,9 +5,13 @@ Daily Erosion project to run sweep.
 
 Storage is in /i/0/wind/{gid:06.0f[:3]}/{gid}.win
 
+- Runs from cron for the previous day at 1 AM local
+- Background --init runs with a keep-out period before 5 AM
+
 """
 
 import sys
+import time
 from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -23,6 +27,7 @@ from pyiem.util import logger, ncopen
 from tqdm import tqdm
 
 LOG = logger()
+US_CENTRAL = ZoneInfo("America/Chicago")
 
 
 def init_workflow(fn: Path, iemre_x: int, iemre_y: int):
@@ -84,13 +89,13 @@ def daily_workflow(progress: tqdm, dt: date):
         LOG.warning("Processing %s is a TODO, punting", dt)
         return
     tidx0 = hourly_offset(
-        datetime(dt.year, dt.month, dt.day, tzinfo=ZoneInfo("America/Chicago"))
+        datetime(dt.year, dt.month, dt.day, tzinfo=US_CENTRAL)
     )
     with ncopen(get_hourly_ncname(dt.year)) as nc:
         uwnd = nc.variables["uwnd"][tidx0 : tidx0 + 24, :, :].filled(0)
         vwnd = nc.variables["vwnd"][tidx0 : tidx0 + 24, :, :].filled(0)
         data = np.hypot(uwnd, vwnd)
-        drct = wind_direction(uwnd * units("m/s"), vwnd * units("m/s"))
+        drct = wind_direction(uwnd * units("m/s"), vwnd * units("m/s")).m
     needle = f" {dt:%-2d} {dt:%-2m} {dt:%Y}"
     for gid, row in progress:
         fn = Path("/i/0/wind") / f"{gid:06.0f}"[:3] / f"{gid:06.0f}.win"
@@ -143,7 +148,7 @@ def main(init: bool, dt: datetime | None, overwrite: bool):
         giddf = pd.read_sql(
             sql_helper("""
     select gid, gridx, gridy from iemre_grid where
-    ST_Contains(ST_MakeEnvelope(-98, 43, -89, 50, 4326), cell_center)
+    ST_Contains(ST_MakeEnvelope(-108, 32, -84, 52, 4326), cell_center)
                 """),
             conn,
             index_col="gid",
@@ -160,6 +165,9 @@ def main(init: bool, dt: datetime | None, overwrite: bool):
             progress.set_description(str(fn))
             if fn.is_file() and not overwrite:
                 continue
+            while datetime.now(US_CENTRAL).hour < 5:
+                progress.write("Sleeping 1200s due to keep-out period < 5AM")
+                time.sleep(1200)
             init_workflow(fn, row["gridx"], row["gridy"])
         return
     daily_workflow(progress, dt.date())
