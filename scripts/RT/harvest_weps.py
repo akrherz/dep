@@ -39,31 +39,55 @@ def main(alldates: bool, wanteddt: datetime | None):
             conn,
         )
     progress = tqdm(fieldsdf.itertuples(), total=len(fieldsdf.index))
-    for row in progress:
-        progress.set_description(f"Processing {row.huc_12} {row.fpath}")
-        outfn = (
-            Path("/i/0/weps")
-            / f"{row.huc_12[:8]}"
-            / f"{row.huc_12[8:]}"
-            / f"{row.huc_12}_{row.fpath}.out"
-        )
-        if not outfn.exists():
-            progress.write(f"Missing {outfn}")
-            continue
-        with open(outfn, "r") as fh:
-            for line in fh:
-                if line.find("doy") > 0:
-                    continue
-                tokens = line.strip().split()
-                if len(tokens) < 20:
-                    continue
-                dt = date(int(tokens[4]), int(tokens[3]), int(tokens[2]))
-                if wanteddt is not None and dt != wanteddt:
-                    continue
-                total_loss = float(tokens[5]) * -1.0
-                if total_loss == 0:
-                    continue
-                progress.write(f"{outfn} {dt} {total_loss}")
+    inserts = 0
+    with get_sqlalchemy_conn("idep") as conn:
+        for row in progress:
+            progress.set_description(
+                f"{row.huc_12}_{row.fpath:04.0f} {inserts}"
+            )
+            outfn = (
+                Path("/i/0/weps")
+                / f"{row.huc_12[:8]}"
+                / f"{row.huc_12[8:]}"
+                / f"{row.huc_12}_{row.fpath}.out"
+            )
+            if not outfn.exists():
+                progress.write(f"Missing {outfn}")
+                continue
+            with open(outfn, "r") as fh:
+                for line in fh:
+                    if line.find("doy") > 0:
+                        continue
+                    tokens = line.strip().split()
+                    if len(tokens) < 20:
+                        continue
+                    dt = date(int(tokens[4]), int(tokens[3]), int(tokens[2]))
+                    if dt.year == 2026:  # Don't want these attm
+                        continue
+                    if wanteddt is not None and dt != wanteddt:
+                        continue
+                    total_loss = float(tokens[5]) * -1.0
+                    if total_loss == 0:
+                        continue
+                    inserts += 1
+                    conn.execute(
+                        sql_helper(
+                            "insert into {table} (field_id, scenario, valid, "
+                            "erosion_kgm2, max_wmps, drct) values (:fld, 0, "
+                            ":valid, :erosion, :max_wmps, :drct)",
+                            table=f"field_wind_erosion_results_{dt.year}",
+                        ),
+                        {
+                            "fld": row.field_id,
+                            "valid": dt,
+                            "erosion": total_loss,
+                            "max_wmps": float(tokens[9]),
+                            "drct": float(tokens[10]),
+                        },
+                    )
+                    if inserts % 1000 == 0:
+                        conn.commit()
+        conn.commit()
 
 
 if __name__ == "__main__":
