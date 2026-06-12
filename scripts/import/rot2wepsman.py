@@ -16,6 +16,7 @@ from tqdm import tqdm
 from dailyerosion.util import load_scenarios
 
 LOG = logger()
+YEARS = 20
 
 
 def do_flowpath(
@@ -43,7 +44,7 @@ def do_flowpath(
 
     # Flying a bit blind here and making life choices
     with open(wepsfn, "w") as outfh, open(rotfn) as rotfh:
-        outfh.write("Version: 1.7\n*START 2\nN\n#----\nB|0\n")
+        outfh.write(f"Version: 1.7\n*START {YEARS}\nN\n#----\nB|0\n")
         rotcode = None
         for line in rotfh:
             if line.startswith("Name = "):
