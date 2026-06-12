@@ -1,4 +1,11 @@
-"""Query CSU CSIP for its soil file for WEPS."""
+"""Query CSU CSIP for its soil file for WEPS.
+
+DEP specific query:
+    select distinct g.mukey, p.cokey from flowpaths f, flowpath_ofes o,
+    gssurgo g, gssurgo25.dep_soilparameters p where
+    scenario = 0 and o.flowpath = f.fid
+    and o.gssurgo_id = g.id and g.mukey = p.mukey::int
+"""
 
 from pathlib import Path
 
@@ -63,16 +70,15 @@ def main():
     with get_sqlalchemy_conn("idep") as conn:
         depsoils = pd.read_sql(
             sql_helper("""
-            -- hacky
             SELECT mukey, max(cokey) as cokey from gssurgo25.dep_soilparameters
             group by mukey
             """),
             conn,
-            index_col="mukey",
         )
     progress = tqdm(depsoils.itertuples(), total=len(depsoils.index))
+    downloaded = 0
     for row in progress:
-        depfn = Path("/i/0/weps_soil_fy2025") / f"{row[0]}.ifc"
+        depfn = Path("/i/0/weps_soil_fy2025") / f"{row.mukey}.ifc"
         if depfn.exists():
             continue
         url = get_url_by_cokey(row.cokey)
@@ -81,6 +87,8 @@ def main():
             continue
         resp = requests.get(url)
         if resp.status_code == 200:
+            downloaded += 1
+            progress.set_description(f"DL: {downloaded}")
             with open(depfn, "wb") as fh:
                 fh.write(resp.content)
 
