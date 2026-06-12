@@ -100,7 +100,9 @@ def daily_workflow(progress: tqdm, dt: date):
     for gid, row in progress:
         fn = Path("/i/0/wind") / f"{gid:06.0f}"[:3] / f"{gid:06.0f}.win"
         if not fn.is_file():
-            progress.write(f"Missing {fn}, skipping")
+            # Ensure we don't see this in a cron job, not useful.
+            if not progress.disable:
+                progress.write(f"Missing {fn}, skipping")
             continue
         with open(fn, encoding="ascii") as fh:
             lines = fh.readlines()
