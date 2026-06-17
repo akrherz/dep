@@ -146,12 +146,8 @@ def main(init: bool, dt: datetime | None, overwrite: bool):
     """Go Main Go."""
     # Get all the gids from IEMRE
     with get_sqlalchemy_conn("iemre") as conn:
-        # Focused on Minnesota ATTM
         giddf = pd.read_sql(
-            sql_helper("""
-    select gid, gridx, gridy from iemre_grid where
-    ST_Contains(ST_MakeEnvelope(-108, 32, -84, 52, 4326), cell_center)
-                """),
+            sql_helper("select gid, gridx, gridy from iemre_grid"),
             conn,
             index_col="gid",
         )
