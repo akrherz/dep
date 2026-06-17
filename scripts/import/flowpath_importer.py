@@ -10,6 +10,7 @@ import glob
 import json
 import logging
 import os
+import sys
 from typing import Optional
 
 import click
@@ -114,9 +115,12 @@ def fillout_codes(df):
         df.loc[df["CP_2018"] == "CP-43", "landuse"] = "4" * YEARS
 
 
-def read_flowpaths(filename: str) -> pd.DataFrame:
+def read_flowpaths(progress: tqdm, filename: str) -> pd.DataFrame | bool:
     """Basics of filepath reading and moidification."""
     df = gpd.read_file(filename, engine="pyogrio")
+    if df.empty:
+        progress.write(f"WARNING: {filename} had no flowpaths")
+        return False
     # smpl3m_mean18040302011002
     huc12 = os.path.basename(filename)[13:25]
     df["huc12"] = huc12
@@ -131,11 +135,13 @@ def read_flowpaths(filename: str) -> pd.DataFrame:
         errors="raise",
     )
     if "irrigated" not in df.columns:
-        LOG.info("%s had no irrigated column", filename)
+        progress.write(f"{filename} has no `irrigated` column, setting 0")
         df["irrigated"] = 0
     if ROTATION_FIELD not in df.columns:
-        errmsg = f"{filename} missing {ROTATION_FIELD} in cols {df.columns}"
-        raise ValueError(errmsg)
+        progress.write(
+            f"{filename} missing {ROTATION_FIELD} in cols {df.columns}"
+        )
+        return False
     return df
 
 
@@ -154,7 +160,7 @@ def read_fields(filename: str) -> pd.DataFrame:
     return df
 
 
-def get_data(filename):
+def get_data(progress: tqdm, filename: str):
     """Converts a GeoJSON file into a pandas dataframe
 
     Args:
@@ -163,7 +169,10 @@ def get_data(filename):
     Returns:
       gpd.DataFrame with the geojson data included.
     """
-    df = read_flowpaths(filename)
+    df = read_flowpaths(progress, filename)
+    if df is False:
+        LOG.warning("FATAL: %s has no flowpaths, stopping", filename)
+        sys.exit(3)
     # Count up unique flowpaths
     PROCESSING_COUNTS["flowpaths_found"] += len(df["fp"].unique())
 
@@ -572,7 +581,7 @@ def scan_file_attributes(fns: list):
     for fn in progress:
         progress.set_description(os.path.basename(fn))
         try:
-            read_flowpaths(fn)
+            read_flowpaths(progress, fn)
             read_fields(fn.replace("smpl3m_mean18", "FB"))
         except Exception as exp:
             logging.error(exp, exc_info=True)
@@ -635,7 +644,7 @@ def main(
                 pgconn.commit()
                 cursor = pgconn.cursor()
             try:
-                fp_df, fld_df = get_data(fn)
+                fp_df, fld_df = get_data(progress, fn)
             except Exception as exp:
                 logging.error(exp, exc_info=True)
                 print(huc12)
