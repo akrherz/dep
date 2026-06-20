@@ -134,6 +134,9 @@ def read_flowpaths(progress: tqdm, filename: str) -> pd.DataFrame | bool:
         },
         errors="raise",
     )
+    # Ensure that landuse and management columns are of expected size.
+    fillout_codes(df)
+
     if "irrigated" not in df.columns:
         progress.write(f"{filename} has no `irrigated` column, setting 0")
         df["irrigated"] = 0
@@ -585,7 +588,6 @@ def scan_file_attributes(fns: list):
             read_fields(fn.replace("smpl3m_mean18", "FB"))
         except Exception as exp:
             logging.error(exp, exc_info=True)
-            print(fn)
             errors = True
     if errors:
         raise ValueError("Found errors in file processing, aborting")
@@ -647,8 +649,7 @@ def main(
                 fp_df, fld_df = get_data(progress, fn)
             except Exception as exp:
                 logging.error(exp, exc_info=True)
-                print(huc12)
-                return
+                continue
             # Sometimes we get no flowpaths, so skip writing those
             huc12 = process(cursor, scenario, fp_df, fld_df)
             if not fp_df.empty:
