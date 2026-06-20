@@ -134,9 +134,6 @@ def read_flowpaths(progress: tqdm, filename: str) -> pd.DataFrame | bool:
         },
         errors="raise",
     )
-    # Ensure that landuse and management columns are of expected size.
-    fillout_codes(df)
-
     if "irrigated" not in df.columns:
         progress.write(f"{filename} has no `irrigated` column, setting 0")
         df["irrigated"] = 0
@@ -145,6 +142,10 @@ def read_flowpaths(progress: tqdm, filename: str) -> pd.DataFrame | bool:
             f"{filename} missing {ROTATION_FIELD} in cols {df.columns}"
         )
         return False
+
+    # Ensure that landuse and management columns are of expected size.
+    fillout_codes(df)
+
     return df
 
 
