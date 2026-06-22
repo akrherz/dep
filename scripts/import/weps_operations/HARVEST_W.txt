@@ -1,0 +1,13 @@
+O 04 Harvest, killing crop 50pct standing stubble
++ 14.311503 0.15
+T Harvest operation, combine, row crop or grain header, remove grain,  residue remains on soil surface, standing and flat residue. Annual crop killed.
+t ARS record - filename is:  Harvest Wheat - grain (combine cutterbar header).oprn This operation record is designed to represent actual field harvesting operation of removing the grain from small grain crops with a cutterbar head on a combine. This harvesting operation record removes all the reproductive component of a crop above the cutting height.  Typically this is specified as the &quot;yield&quot; component in the crop record. The non-harvested crop plant material above the specified cut height becomes flat residue. The remaining above ground crop material below the specified cut height becomes standing residue. Nov 02, 2005  Created - Larry Wagner Detailed info regarding this operation record: This harvest record specifies the actual cut height dependent upon the height of the crop.  The cut height is specified as a fraction of the crop height. Added 0.2 for the flatting of the combine and tire trafic for haulling grain. MAS 1-18-07 The harvesting operation could also have an effect on the &quot;standing stalk&quot; fall rate and fall threshold values.  The default &quot;biomass pool&quot; flag parameter is set to &quot;No adjustments applied&quot; so that no &quot;stalk residue decay rate change&quot; will occur. However, this flag value can be changed along with the default parameter values to change the &quot;stalk residue decay processes&quot;. LMOD and WEPS update correlation; existing WEPS operation record, 160410 jkp
++
+G 02 Biomass Manipulation
++ 1.0
+P 31 Kill or Defoliate Growing Crop
++ 2
+P 43 Cut/Remove Biomass by Fraction (flags)
++ 1 1 0 1 0.2 1.0 0.0 0.0
+P 24 Flatten Standing Biomass
++ 0 0.2 0.2 0.2 0.2 1.0
