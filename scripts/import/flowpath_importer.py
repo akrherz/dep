@@ -341,8 +341,8 @@ def insert_ofe(cursor, gdf, db_fid, ofe, ofe_starts):
     cursor.execute(
         """
     INSERT into flowpath_ofes (flowpath, ofe, geom, bulk_slope, max_slope,
-    gssurgo_id, fbndid, management, landuse, real_length, field_id, groupid)
-    values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    gssurgo_id, management, landuse, real_length, field_id, groupid)
+    values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             db_fid,
@@ -351,7 +351,6 @@ def insert_ofe(cursor, gdf, db_fid, ofe, ofe_starts):
             bulk_slope,
             gdf["slope"].max(),
             gssurgo_id,
-            firstpt["FBndID"],
             firstpt["management"],
             firstpt["landuse"],
             (lastpt["len"] - firstpt["len"]) / 100.0,

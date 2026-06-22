@@ -148,14 +148,14 @@ def do_huc12(
         sql_helper(
             """
         with myofes as (
-            select o.ofe, p.fpath, o.fbndid
+            select o.ofe, p.fpath, o.field_id
             from flowpaths p, flowpath_ofes o, gssurgo g
             WHERE o.flowpath = p.fid and p.huc_12 = :huc12
             and p.scenario = :scenario and o.gssurgo_id = g.id),
         agg as (
             SELECT ofe, fpath, f.fbndid, f.landuse,
             f.management, f.acres, f.field_id
-            from fields f LEFT JOIN myofes m on (f.fbndid = m.fbndid)
+            from fields f LEFT JOIN myofes m on (f.field_id = m.field_id)
             WHERE f.huc12 = :huc12 and
             substr(landuse, :dbcolidx, 1) = ANY(:crops)
             ORDER by fpath, ofe)

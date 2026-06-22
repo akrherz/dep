@@ -1,0 +1,16 @@
+O 04 Harvest, hay, grass or legume
++ 14.7109 0.15
+T Harvest operation, cut and remove fraction of above ground crop to the cutting height set in the crop record such as hay, grass or other annual or perennial  forage crops, cutting height and harvest moisture based on selected forage crop record. Annual crops or perennials are not killed.
+t Harvest legume hay crops such as Alfalfa and Red clover and grass-legume mixed hay such as Alfalfa-Bromegrass.Use Harvest, grass hay" for pure grass hay. Rev 11/17/01 DTL"  MAS 11-29-06Reset the fuel use to 1.92 gal/ac MAS 10-21-11LMOD and WEPS update correlation; existing WEPS operation record, 160410 jkpHarvest operation designed for perennial, muliple harvest crops.  160628 jkp
++
+G 02 Biomass Manipulation
++ 1.0
+P 42 Cut/Remove Biomass to Height (flags)
++ 1 0 0 0 0 101.600204 0.9 .9 1
+P 34 Change Standing Biomass Fall Rate
++ 0 1.1 1.08 1.06 1.04 1.0
++ 0.9 0.92 0.93 0.95 1.0
+P 40 End crop Biomass Manipulation
+P 24 Flatten Standing Biomass
++ 14 0.6 0.5 0.4 0.5 0.5
+

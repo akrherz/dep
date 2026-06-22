@@ -46,7 +46,7 @@ def job(dates: list[date], tmpdir, huc12: str) -> int:
     ), toplayer as (
         select mukey, om from layers where rank = 1
     )
-    select o.ofe, p.fpath, o.fbndid,
+    select o.ofe, p.fpath, f.fbndid,
     g.plastic_limit as raw_plastic_limit,
     g.wepp_min_sw1 + (g.wepp_max_sw1 - g.wepp_min_sw1) * 0.5796 as fieldcap58,
     case when
@@ -61,6 +61,7 @@ def job(dates: list[date], tmpdir, huc12: str) -> int:
     substr(o.landuse, :charat, 1) as crop
     from
     flowpaths p LEFT JOIN flowpath_ofes o on p.fid = o.flowpath
+      LEFT JOIN fields f on o.field_id = f.field_id
       LEFT JOIN gssurgo g on o.gssurgo_id = g.id
       LEFT JOIN toplayer tl on g.mukey = tl.mukey::int
     WHERE p.huc_12 = :huc12 and p.scenario = 0

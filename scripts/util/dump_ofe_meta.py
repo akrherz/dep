@@ -53,9 +53,9 @@ def main():
                 st_y(st_pointn(st_transform(o.geom, 4326), 1)) as lat,
                 o.bulk_slope,
                 o.max_slope,
-                landuse, management,
+                o.landuse, o.management,
                 g.mukey as surgo24,
-                kwfact, hydrogroup, fbndid,
+                kwfact, hydrogroup, d.fbndid,
                 o.real_length as length, groupid,
                 substr(o.management, 17, 1) as tillage2023,
                 substr(o.landuse, 17, 1) as landuse2023,
@@ -66,6 +66,7 @@ def main():
                 (o.flowpath = f.fid)
                 JOIN gssurgo g on (o.gssurgo_id = g.id)
                 JOIN soilstuff s on (g.mukey = s.mukey)
+                JOIN fields d on (o.field_id = d.field_id)
                 WHERe f.scenario = 0
             """),
             conn,

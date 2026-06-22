@@ -5,6 +5,7 @@ This is very limited at the moment and only supporting Corn/Beans
 """
 
 import glob
+import sys
 from pathlib import Path
 
 import click
@@ -49,22 +50,44 @@ def do_flowpath(
         for line in rotfh:
             if line.startswith("Name = "):
                 rotcode = line.split("=")[1].strip().split("-")[0]
-            if line.find(" Tillage ") == -1 and line.find("Harvest") == -1:
+            if (
+                " Tillage " not in line
+                and "Harvest" not in line
+                and "Perennial" not in line
+            ):
                 continue
             (month, day, year, _, oplabel, opcropdef, *_) = line.split()
             cropcode = rotcode[int(year) - 1]
-            if cropcode not in ["C", "B"]:
+            # Can't deal with Forest yet
+            if cropcode == "F":
                 continue
-            if oplabel == "Harvest-Annual":
+            # Going to default to Soybean for anything we currently don't know
+            # about. This will get fixed eventually.
+            if cropcode not in ["C", "B", "P", "W"]:
+                cropcode = "B"
+            if oplabel in ["Harvest-Annual", "Cut-Perennial"]:
                 payload = weps_operations[f"HARVEST_{cropcode}"]
+            elif oplabel == "Plant-Perennial":
+                payload = weps_operations[f"FCSTACDP_{cropcode}"]
             else:
                 opcropdef = opcropdef.replace("OpCropDef.", "")
-                if opcropdef.startswith("PL"):
+                # Handled later
+                if opcropdef == "FCSTACDP" and cropcode != "W":
+                    continue
+                # Unhandled
+                if opcropdef in ["ANHYDROS", "HASPTCT", "DRDDO", "CHISCOST"]:
+                    continue
+                if opcropdef.startswith("PL") or opcropdef == "DRNTFRFC":
                     opcropdef = f"{opcropdef}_{cropcode}"
                 try:
                     payload = weps_operations[opcropdef]
                 except KeyError:
-                    continue
+                    LOG.warning(
+                        "Unable to find operation for %s, crop %s, aborting",
+                        opcropdef,
+                        cropcode,
+                    )
+                    sys.exit(1)
             # NOTE: WEPS management files are 1 indexed, not real years!!!
             outfh.write(
                 f"D {int(day):02.0f}/{int(month):02.0f}/{int(year):02.0f}\n"
