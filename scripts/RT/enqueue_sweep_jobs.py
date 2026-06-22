@@ -92,7 +92,7 @@ def main(date: datetime, scenario: int, myhucs: str | None, queue: str):
     sts = datetime.now()
 
     for row in fieldsdf.itertuples():
-        ifcfile = Path(f"/i/0/weps_soil_fy2025/{row.mukey}.ifc")
+        ifcfile = Path(f"/i/0/weps_soil_fy2024/{row.mukey}.ifc")
         if not ifcfile.exists():
             ifcfile = Path("/i/0/weps_test/Bearden_I119A_70_SICL.ifc")
         payload = SweepJobPayload(
