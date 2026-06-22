@@ -112,7 +112,7 @@ def main(
         if not for_sweep:
             gid = f"{get_gid(row.lon, row.lat):06.0f}"
             windfile = f"/i/0/wind/{gid[:3]}/{gid}.win"
-        ifcfile = Path(f"/i/0/weps_soil_fy2025/{row.mukey}.ifc")
+        ifcfile = Path(f"/i/0/weps_soil_fy2024/{row.mukey}.ifc")
         if not ifcfile.exists():
             ifcfile = Path("/i/0/weps_test/Bearden_I119A_70_SICL.ifc")
         payload = WEPSJobPayload(

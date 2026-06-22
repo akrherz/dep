@@ -78,7 +78,8 @@ def main():
     progress = tqdm(depsoils.itertuples(), total=len(depsoils.index))
     downloaded = 0
     for row in progress:
-        depfn = Path("/i/0/weps_soil_fy2025") / f"{row.mukey}.ifc"
+        # Present belief is that CSIP emits FY2024 files
+        depfn = Path("/i/0/weps_soil_fy2024") / f"{row.mukey}.ifc"
         if depfn.exists():
             continue
         url = get_url_by_cokey(row.cokey)
