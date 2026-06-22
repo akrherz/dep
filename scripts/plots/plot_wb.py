@@ -21,7 +21,7 @@ def get_plastic_limit(huc12: str, year: int) -> pd.DataFrame:
         return pd.read_sql(
             sql_helper(
                 """
-                select o.ofe, p.fpath, o.fbndid,
+                select o.ofe, p.fpath, f.fbndid,
                 g.wepp_min_sw1,
                 g.wepp_max_sw1,
                 g.wepp_min_sw,
@@ -29,9 +29,10 @@ def get_plastic_limit(huc12: str, year: int) -> pd.DataFrame:
                 g.plastic_limit,
                 substr(landuse, :charat, 1) as crop,
                 p.fpath || '_' || o.ofe as combo
-                from flowpaths p, flowpath_ofes o, gssurgo g
+                from flowpaths p, flowpath_ofes o, gssurgo g, fields f
                 WHERE o.flowpath = p.fid and p.huc_12 = :huc12
-                and p.scenario = 0 and o.gssurgo_id = g.id
+                and p.scenario = 0 and o.gssurgo_id = g.id and
+                o.field_id = f.field_id
             """
             ),
             conn,
