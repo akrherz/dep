@@ -30,7 +30,7 @@ def main(alldates: bool, wanteddt: datetime | None):
     sql = """
     select p.fpath, p.huc_12, o.field_id
     from flowpaths p, flowpath_ofes o, fields f WHERE
-    p.huc_12 = '070802020102' and p.scenario = 0 and p.fid = o.flowpath and
+    p.scenario = 0 and p.fid = o.flowpath and
     o.field_id = f.field_id and o.ofe = 1
     """
     with get_sqlalchemy_conn("idep") as conn:
