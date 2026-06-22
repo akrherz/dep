@@ -22,7 +22,7 @@ def get_plastic_limit(huc12: str, year: int) -> pd.DataFrame:
                 as plastic_limit58,
                 g.plastic_limit,
                 p.fpath || '_' || o.ofe as combo,
-                substr(landuse, :charat, 1) as crop
+                substr(f.landuse, :charat, 1) as crop
                 from flowpaths p, flowpath_ofes o, gssurgo g, fields f
                 WHERE o.flowpath = p.fid and p.huc_12 = :huc12
                 and p.scenario = 0 and o.gssurgo_id = g.id

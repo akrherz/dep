@@ -73,7 +73,7 @@ def main(argv):
             f.huc_12 || '_' || f.fpath || '_' || o.ofe as id from
             flowpath_ofes o JOIN flowpaths f on (o.flowpath = f.fid)
             JOIN fields on (o.field_id = fields.field_id)
-            WHERE scenario = 0 and huc_12 = '071000081505'
+            WHERE f.scenario = 0 and f.huc_12 = '071000081505'
             """,
             conn,
             geom_col="geo",

@@ -53,7 +53,7 @@ def main():
                 st_y(st_pointn(st_transform(o.geom, 4326), 1)) as lat,
                 o.bulk_slope,
                 o.max_slope,
-                landuse, management,
+                o.landuse, o.management,
                 g.mukey as surgo24,
                 kwfact, hydrogroup, d.fbndid,
                 o.real_length as length, groupid,
