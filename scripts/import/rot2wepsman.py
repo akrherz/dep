@@ -65,9 +65,9 @@ def do_flowpath(
                     payload = weps_operations[opcropdef]
                 except KeyError:
                     continue
+            # NOTE: WEPS management files are 1 indexed, not real years!!!
             outfh.write(
-                f"D {int(day):02.0f}/{int(month):02.0f}/"
-                f"{int(year) + 2006:02.0f}\n"
+                f"D {int(day):02.0f}/{int(month):02.0f}/{int(year):02.0f}\n"
             )
             outfh.write(payload + "\n#----\n")
         outfh.write("*END\n*EOF")
