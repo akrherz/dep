@@ -19,8 +19,8 @@ def persist_to_database(cursor, result: SweepJobResult):
     """Insert the result into the database."""
     cursor.execute(
         """
-    insert into field_wind_erosion_results (field_id, scenario,
-    valid, erosion_kgm2, avg_wmps, max_wmps, drct) values
+    insert into field_wind_erosion_results (field_id, scenario_id,
+    valid, erosion_kgm2, avg_wind_speed_mps, max_wind_speed_mps, drct) values
     (%s,%s,%s,%s,%s,%s,%s)
     """,
         (
@@ -45,7 +45,7 @@ def main():
 
     def db_worker():
         """Run in a thread."""
-        conn, cursor = get_dbconnc("idep")
+        conn, cursor = get_dbconnc("dep")
         while True:
             result = db_queue.get()
             if result is None:
@@ -55,7 +55,7 @@ def main():
                 conn.commit()
             except Exception as exp:
                 print(f"Error persisting to database: {exp}, reconnecting")
-                conn, cursor = get_dbconnc("idep")
+                conn, cursor = get_dbconnc("dep")
             db_queue.task_done()
 
     threading.Thread(target=db_worker, daemon=True).start()

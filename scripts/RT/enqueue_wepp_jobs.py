@@ -50,11 +50,13 @@ def main(scenario: int, runerrors: bool, myhucs: str | None, queue: str):
         with open(myhucs, encoding="ascii") as fh:
             myhucs = [s.strip() for s in fh]
 
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         # Figure out the source of flowpaths
         res = conn.execute(
             sql_helper(
-                "SELECT flowpath_scenario from scenarios where id = :scenario"
+                """
+    SELECT flowpath_scenario from scenarios where scenario_id = :scenario
+    """
             ),
             {"scenario": scenario},
         )
@@ -63,11 +65,13 @@ def main(scenario: int, runerrors: bool, myhucs: str | None, queue: str):
         flowpathdf = pd.read_sql(
             sql_helper(
                 """
-        SELECT huc_12, fpath, filepath, ofe_count, irrigated
-        from flowpaths f JOIN climate_files c on (f.climate_file_id = c.id)
-        where f.scenario = :flscenario {huclimit}
+        SELECT huc12_code, huc12_fpath_num, filepath, ofe_count, irrigated
+        from flowpath p
+        JOIN climate_file c on (p.climate_file_id = c.climate_file_id)
+        JOIN huc12 h on (p.huc12_id = h.huc12_id)
+        where p.scenario_id = :flscenario {huclimit}
         """,
-                huclimit=" and huc_12 = ANY(:hucs)" if myhucs else "",
+                huclimit=" and h.huc12_code = ANY(:hucs)" if myhucs else "",
             ),
             conn,
             params={"flscenario": flscenario, "hucs": myhucs},
@@ -84,8 +88,8 @@ def main(scenario: int, runerrors: bool, myhucs: str | None, queue: str):
 
     for row in flowpathdf.itertuples():
         errfn = (
-            f"/i/0/error/{row.huc_12[:8]}/{row.huc_12[8:]}"
-            f"/{row.huc_12}_{row.fpath}.error"
+            f"/i/0/error/{row.huc12_code[:8]}/{row.huc12_code[8:]}"
+            f"/{row.huc12_code}_{row.huc12_fpath_num}.error"
         )
         if runerrors:
             if not os.path.isfile(errfn):
@@ -97,11 +101,11 @@ def main(scenario: int, runerrors: bool, myhucs: str | None, queue: str):
             wepprun=build_runfile(
                 weppconfig,
                 f"/i/{scenario}/{{prefix}}/"
-                f"{row.huc_12[:8]}/{row.huc_12[8:]}/"
-                f"{row.huc_12}_{row.fpath}.{{prefix}}",
+                f"{row.huc12_code[:8]}/{row.huc12_code[8:]}/"
+                f"{row.huc12_code}_{row.huc12_fpath_num}.{{prefix}}",
                 f"/i/{scenario}/{{prefix}}/"
-                f"{row.huc_12[:8]}/{row.huc_12[8:]}/"
-                f"{row.huc_12}_{row.fpath}.{{prefix}}",
+                f"{row.huc12_code[:8]}/{row.huc12_code[8:]}/"
+                f"{row.huc12_code}_{row.huc12_fpath_num}.{{prefix}}",
                 row.filepath,
                 f"/i/{scenario}/irrigation/ofe{row.ofe_count}.txt",
             ),

@@ -99,14 +99,14 @@ def load_precip(dates, huc12s):
       dict of [date][huc12]
     """
     # 1. Build GeoPandas DataFrame of HUC12s of interest
-    idep = get_dbconn("idep")
+    idep = get_dbconn("dep")
     huc12df = gpd.GeoDataFrame.from_postgis(
         """
-        SELECT huc_12, ST_Transform(simple_geom, 4326) as geo
-        from huc12 WHERE scenario = 0
+        SELECT huc12_code, ST_Transform(simple_geom, 4326) as geo
+        from huc12 WHERE scenario_id = 0
     """,
         idep,
-        index_col="huc_12",
+        index_col="huc12_code",
         geom_col="geo",
     )
     if CONFIG["subset"]:
@@ -138,12 +138,16 @@ def load_precip(dates, huc12s):
 def load_lengths(scenario):
     """Build out our flowpath lengths."""
     sdf = load_scenarios()
-    idep = get_dbconn("idep")
-    icursor = idep.cursor()
+    dep = get_dbconn("dep")
+    icursor = dep.cursor()
     res = {}
     icursor.execute(
-        "SELECT huc_12, fpath, ST_Length(geom) from flowpaths where "
-        "scenario = %s",
+        """
+        SELECT huc12_code, huc12_fpath_num, length_m
+        FROM flowpath p
+        JOIN huc12 h ON (p.huc12_id = h.huc12_id)
+        WHERE p.scenario_id = %s
+        """,
         (int(sdf.loc[scenario, "flowpath_scenario"]),),
     )
     for row in icursor:

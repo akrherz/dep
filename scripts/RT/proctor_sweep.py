@@ -118,8 +118,9 @@ def workflow(arg):
     (idx, row) = arg
     # 1. Replace wind information in each sweepin file
     sweepinfn = (
-        f"/i/{row['scenario']}/sweepin/{row['huc_12'][:8]}/"
-        f"{row['huc_12'][8:12]}/{row['huc_12']}_{row['fpath']}.sweepin"
+        f"/i/{row['scenario']}/sweepin/{row['huc12_code'][:8]}/"
+        f"{row['huc12_code'][8:12]}/"
+        f"{row['huc12_code']}_{row['huc12_fpath_num']}.sweepin"
     )
     cropcode = compute_crop(
         sweepinfn.replace("sweepin", "man"),
@@ -185,7 +186,7 @@ def workflow(arg):
     return idx, erosion
 
 
-@with_sqlalchemy_conn("idep")
+@with_sqlalchemy_conn("dep")
 def write_database(
     scenario: int,
     dt: datetime,
@@ -195,7 +196,7 @@ def write_database(
     """Write things to the database."""
     res = conn.execute(
         sql_helper("""
-                delete from wind_results_by_huc12 where scenario = :scenario
+                delete from wind_results_by_huc12 where scenario_id = :scenario
                 and valid = :dt
         """),
         {"scenario": scenario, "dt": dt},
@@ -208,7 +209,7 @@ def write_database(
         conn.execute(
             sql_helper("""
             insert into wind_results_by_huc12
-            (scenario, valid, huc_12, avg_loss) VALUES
+            (scenario_id, valid, huc_12, avg_loss) VALUES
             (:scenario, :valid, :huc12, :avg_loss)
                     """),
             {
@@ -227,14 +228,15 @@ def write_database(
 @click.option("--workers", type=int, default=4, help="Number of workers")
 def main(scenario: int, dt: datetime, workers: int):
     """Go Main Go."""
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         df = pd.read_sql(
             sql_helper("""
-            SELECT huc_12, fpath, scenario,
-            ST_x(ST_Transform(ST_PointN(geom, 1), 4326)) as lon,
-            ST_y(ST_Transform(ST_PointN(geom, 1), 4326)) as lat
-            from flowpaths where scenario = :scenario
-            and huc_12 = ANY(:huc12s)
+            SELECT huc12_code, huc12_fpath_num, scenario_id,
+            ST_x(ST_Transform(ST_PointN(p.geom, 1), 4326)) as lon,
+            ST_y(ST_Transform(ST_PointN(p.geom, 1), 4326)) as lat
+            from flowpath p JOIN huc12 h on (p.huc12_id = h.huc12_id)
+            where p.scenario_id = :scenario
+            and h.huc12_code = ANY(:huc12s)
         """),
             conn,
             params={"scenario": scenario, "huc12s": GRAPH_HUC12},
@@ -261,7 +263,7 @@ def main(scenario: int, dt: datetime, workers: int):
         LOG.warning("Some jobs failed, not writing to database")
         return
 
-    results = df[["huc_12", "erosion"]].groupby("huc_12").describe()
+    results = df[["huc12_code", "erosion"]].groupby("huc12_code").describe()
     LOG.warning(results[("erosion", "mean")])
     write_database(scenario, dt, results)
 

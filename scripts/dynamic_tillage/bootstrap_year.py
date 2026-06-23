@@ -19,13 +19,13 @@ LOG = logger()
 def main(year: int, scenario: int):
     """Run for the given year."""
     dbcolidx = year - 2007 + 1
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         # Delete current year's data
         res = conn.execute(
             sql_helper("""
-                 delete from field_operations o USING fields f
+                 delete from field_operations o USING field f
                  WHERE o.field_id = f.field_id and o.year = :year
-                 and f.scenario = :scenario
+                 and f.scenario_id = :scenario
                  """),
             {"year": year, "scenario": scenario},
         )
@@ -37,7 +37,7 @@ def main(year: int, scenario: int):
             sql_helper("""
                 select field_id, landuse, management,
                 st_y(st_centroid(st_transform(geom, 4326))) as lat
-                from fields where scenario = :scenario
+                from field where scenario_id = :scenario
                 and substr(landuse, :dbcolidx, 1) = ANY(:crops)
                 and management is not null
             """),
@@ -50,7 +50,7 @@ def main(year: int, scenario: int):
             index_col="field_id",
         )
     LOG.info("Processing %s fields", len(fields.index))
-    conn, cursor = get_dbconnc("idep")
+    conn, cursor = get_dbconnc("dep")
     colidx = year - 2007
     inserts = 0
     progress = tqdm(fields.iterrows(), total=len(fields.index))

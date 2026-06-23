@@ -136,10 +136,10 @@ def load_precip(dates, huc12s):
     """
     # 1. Build GeoPandas DataFrame of HUC12s of interest
     huc12df = gpd.GeoDataFrame.from_postgis(
-        "SELECT huc_12, ST_Transform(simple_geom, 4326) as geo from huc12 "
-        "WHERE scenario = 0",
-        get_dbconnstr("idep"),
-        index_col="huc_12",
+        "SELECT huc12_code, ST_Transform(simple_geom, 4326) as geo from huc12 "
+        "WHERE scenario_id = 0",
+        get_dbconnstr("dep"),
+        index_col="huc12_code",
         geom_col="geo",
     )
     if CONFIG["subset"]:
@@ -186,12 +186,14 @@ def load_precip(dates, huc12s):
 def load_lengths(scenario):
     """Build out our flowpath lengths."""
     sdf = load_scenarios()
-    idep = get_dbconn("idep")
-    icursor = idep.cursor()
+    dep = get_dbconn("dep")
+    icursor = dep.cursor()
     res = {}
     icursor.execute(
-        "SELECT huc_12, fpath, ST_Length(geom) from flowpaths where "
-        "scenario = %s",
+        """
+    SELECT huc12_code, huc12_fpath_num, length_m
+    from flowpath p JOIN huc12 h on (p.huc12_id = h.huc12_id) where
+    p.scenario_id = %s""",
         (int(sdf.loc[scenario, "flowpath_scenario"]),),
     )
     for row in icursor:
@@ -205,14 +207,19 @@ def delete_previous_entries(icursor, scenario, huc12, dates):
     if len(dates) > 366:
         # Means we are running for 'all'
         icursor.execute(
-            "DELETE from results_by_huc12 WHERE scenario = %s and huc_12 = %s",
-            (scenario, huc12),
+            """
+    DELETE from water_results_by_huc12 WHERE scenario_id = %s
+    and huc12_id = get_huc12_id(%s, %s)
+    """,
+            (scenario, huc12, scenario),
         )
     else:
         icursor.execute(
-            "DELETE from results_by_huc12 WHERE valid = ANY(%s) and "
-            "scenario = %s and huc_12 = %s",
-            (dates, scenario, huc12),
+            """"
+    DELETE from water_results_by_huc12 WHERE valid = ANY(%s) and
+    scenario_id = %s and huc12_id = get_huc12_id(%s, %s)
+            """,
+            (dates, scenario, huc12, scenario),
         )
     return icursor.rowcount
 
@@ -230,14 +237,14 @@ def save_results(icursor, scenario, huc12, df, dates):
         inserts += 1
         icursor.execute(
             """
-            INSERT into results_by_huc12
-            (huc_12, valid, scenario,
-            min_precip, avg_precip, max_precip,
-            min_loss, avg_loss, max_loss,
-            min_runoff, avg_runoff, max_runoff,
-            min_delivery, avg_delivery, max_delivery,
-            qc_precip) VALUES
-            (%s, %s, %s,
+            INSERT into water_results_by_huc12
+            (huc12_id, valid, scenario_id,
+            min_precip_mm, avg_precip_mm, max_precip_mm,
+            min_loss_kgm2, avg_loss_kgm2, max_loss_kgm2,
+            min_runoff_mm, avg_runoff_mm, max_runoff_mm,
+            min_delivery_kgm2, avg_delivery_kgm2, max_delivery_kgm2,
+            qc_precip_mm) VALUES
+            (get_huc12_id(%s, %s), %s, %s,
             coalesce(%s, 0.), coalesce(%s, 0.), coalesce(%s, 0.),
             coalesce(%s, 0.), coalesce(%s, 0.), coalesce(%s, 0.),
             coalesce(%s, 0.), coalesce(%s, 0.), coalesce(%s, 0.),
@@ -245,6 +252,7 @@ def save_results(icursor, scenario, huc12, df, dates):
         """,
             (
                 huc12,
+                scenario,
                 row["date"],
                 scenario,
                 row["min_precip"],
@@ -267,7 +275,7 @@ def save_results(icursor, scenario, huc12, df, dates):
 
 def update_metadata(scenario, dates):
     """Update database property for this scenario."""
-    pgconn = get_dbconn("idep")
+    pgconn = get_dbconn("dep")
     icursor = pgconn.cursor()
     maxdate = max(dates)
     pkey = f"last_date_{scenario}"
@@ -291,7 +299,7 @@ def update_metadata(scenario, dates):
 def do_huc12(arg):
     """Process a huc12's worth of WEPP output files"""
     scenario, huc12, lengths, dates, precip = arg
-    pgconn = get_dbconn("idep")
+    pgconn = get_dbconn("dep")
     icursor = pgconn.cursor()
     basedir = f"/i/{scenario}/env/{huc12[:8]}/{huc12[8:]}"
     frames = [

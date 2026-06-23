@@ -86,7 +86,7 @@ def test_slope_class():
 
 def test_clear_huc12data():
     """Can we clear data?"""
-    dbconn, cursor = get_dbconnc("idep")
+    dbconn, cursor = get_dbconnc("dep")
     clear_huc12data(cursor, "123456789012", 0)
     cursor.close()
     dbconn.close()

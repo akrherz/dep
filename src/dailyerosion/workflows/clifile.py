@@ -133,12 +133,12 @@ def load_clifiles(tile: Tile) -> pd.DataFrame:
     Important: The west and south values are inclusive, while the east and
     north values are exclusive.
     """
-    dbname = "idep" if tile.domain in ["", "conus"] else f"dep_{tile.domain}"
+    dbname = "dep" if tile.domain in ["", "conus"] else f"dep_{tile.domain}"
     with get_sqlalchemy_conn(dbname) as conn:
         return pd.read_sql(
             sql_helper("""
-    select st_x(geom) as lon, st_y(geom) as lat, filepath from climate_files
-    WHERE scenario = :scenario and ST_Contains(
+    select st_x(geom) as lon, st_y(geom) as lat, filepath from climate_file
+    WHERE scenario_id = :scenario and ST_Contains(
         ST_MakeEnvelope(:west, :south, :east, :north, 4326), geom)
                  """),
             conn,

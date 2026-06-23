@@ -1,13 +1,11 @@
 """Suck in the yield data!"""
 
-# stdlib
 import datetime
 import multiprocessing
 import os
 import sys
 from io import StringIO
 
-# third party
 import pandas as pd
 from pyiem.database import get_dbconn
 from tqdm import tqdm
@@ -78,10 +76,10 @@ def main(argv):
         ].to_csv(tdf, mode="a", sep="\t", index=False, header=False)
 
     tdf.seek(0)
-    pgconn = get_dbconn("idep")
+    pgconn = get_dbconn("dep")
     cursor = pgconn.cursor()
     cursor.execute(
-        "DELETE from harvest WHERE scenario = %s "
+        "DELETE from harvest WHERE scenario_id = %s "
         "and valid >= %s and valid <= %s",
         (scenario, datetime.date(year, 1, 1), datetime.date(year, 12, 31)),
     )
@@ -90,7 +88,7 @@ def main(argv):
         tdf,
         "harvest",
         columns=(
-            "scenario",
+            "scenario_id",
             "valid",
             "huc12",
             "fpath",

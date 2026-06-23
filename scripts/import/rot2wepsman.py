@@ -118,15 +118,16 @@ def workflow(df: pd.DataFrame, scenario: int):
 @click.option("-s", "--scenario", type=int, help="DEP Scenario", required=True)
 def main(scenario: int):
     """Go main go"""
-    with get_sqlalchemy_conn("idep") as pgconn:
+    with get_sqlalchemy_conn("dep") as pgconn:
         df = pd.read_sql(
             sql_helper("""
-        SELECT fpath, huc_12 from flowpaths f JOIN flowpath_ofes o
-        on (f.fid = o.flowpath)
-        WHERE f.scenario = :scenario and (
+        SELECT huc12_fpath_num, huc12_code
+        from flowpath p JOIN flowpath_ofe o on (p.flowpath_id = o.flowpath_id)
+        JOIN field f on (o.field_id = f.field_id)
+        WHERE p.scenario_id = :scenario and (
         strpos(landuse, 'C') > 0 or strpos(landuse, 'B') > 0
         )
-        ORDER by huc_12 ASC
+        ORDER by huc12_code ASC
             """),
             pgconn,
             params={"scenario": get_flowpath_scenario(scenario)},
