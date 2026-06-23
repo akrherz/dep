@@ -148,17 +148,20 @@ def do_huc12(
         sql_helper(
             """
         with myofes as (
-            select o.ofe, p.fpath, o.field_id
-            from flowpaths p, flowpath_ofes o, gssurgo g
-            WHERE o.flowpath = p.fid and p.huc_12 = :huc12
-            and p.scenario = :scenario and o.gssurgo_id = g.id),
+            select o.ofe, p.huc12_fpath_num, o.field_id
+            from flowpath p JOIN flowpath_ofe o
+                ON (p.flowpath_id = o.flowpath_id)
+            JOIN gssurgo g ON (o.gssurgo_id = g.gssurgo_id)
+            JOIN huc12 h ON (p.huc12_id = h.huc12_id)
+            WHERE h.huc12_code = :huc12_code
+            and p.scenario_id = :scenario),
         agg as (
-            SELECT ofe, fpath, f.fbndid, f.landuse,
+            SELECT ofe, huc12_fpath_num, f.huc12_fbndid_num, f.landuse,
             f.management, f.acres, f.field_id
-            from fields f LEFT JOIN myofes m on (f.field_id = m.field_id)
-            WHERE f.huc12 = :huc12 and
+            from field f LEFT JOIN myofes m on (f.field_id = m.field_id)
+            WHERE f.huc12_id = get_huc12_id(:huc12_code, :scenario) and
             substr(landuse, :dbcolidx, 1) = ANY(:crops)
-            ORDER by fpath, ofe)
+            ORDER by huc12_fpath_num, ofe)
         select a.*, o.till1, o.till2, o.till3, o.plant, o.year,
         plant >= :dt as plant_needed,
         coalesce(
@@ -173,7 +176,7 @@ def do_huc12(
         ),
         conn,
         params={
-            "huc12": huc12,
+            "huc12_code": huc12,
             "year": dt.year,
             "dt": dt.date(),
             "crops": crops,

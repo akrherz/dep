@@ -83,25 +83,36 @@ def clear_huc12data(cursor, huc12, scenario) -> Tuple[int, int, int, int]:
         deleted_fields (int): Number of fields deleted
     """
     cursor.execute(
-        "delete from flowpath_ofes o using flowpaths f where "
-        "o.flowpath = f.fid and f.huc_12 = %s and f.scenario = %s",
-        (huc12, scenario),
+        """
+    delete from flowpath_ofe o using flowpath f where
+    o.flowpath_id = f.flowpath_id and f.huc12_id = get_huc12_id(%s, %s)
+    and f.scenario_id = %s
+        """,
+        (huc12, scenario, scenario),
     )
     deleted_ofes = cursor.rowcount
     cursor.execute(
-        "DELETE from flowpaths WHERE scenario = %s and huc_12 = %s",
-        (scenario, huc12),
+        """
+        DELETE from flowpath WHERE scenario_id = %s and
+        huc12_id = get_huc12_id(%s, %s)
+        """,
+        (scenario, huc12, scenario),
     )
     deleted_flowpaths = cursor.rowcount
     cursor.execute(
-        "delete from field_operations o using fields f where "
-        "o.field_id = f.field_id and f.huc12 = %s and f.scenario = %s",
-        (huc12, scenario),
+        """
+    delete from field_operations o using field f where
+    o.field_id = f.field_id and f.huc12_id = get_huc12_id(%s, %s)
+    and f.scenario_id = %s
+    """,
+        (huc12, scenario, scenario),
     )
     deleted_field_operations = cursor.rowcount
     cursor.execute(
-        "DELETE from fields WHERE scenario = %s and huc12 = %s",
-        (scenario, huc12),
+        """
+    DELETE from field WHERE scenario_id = %s and
+    huc12_id = get_huc12_id(%s, %s)""",
+        (scenario, huc12, scenario),
     )
     deleted_fields = cursor.rowcount
     return (
@@ -114,11 +125,11 @@ def clear_huc12data(cursor, huc12, scenario) -> Tuple[int, int, int, int]:
 
 def load_scenarios():
     """Build a dataframe of DEP scenarios."""
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         return pd.read_sql(
-            sql_helper("SELECT * from scenarios ORDER by id ASC"),
+            sql_helper("SELECT * from scenario ORDER by scenario_id ASC"),
             conn,
-            index_col="id",
+            index_col="scenario_id",
         )
 
 

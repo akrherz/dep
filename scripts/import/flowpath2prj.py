@@ -167,8 +167,9 @@ def rotation_magic(scenario, zone, seqnum, row, metadata):
       row (dict): the database info for this row.
     """
     rotfn = (
-        f"/i/{scenario}/rot/{metadata['huc_12'][:8]}/{metadata['huc_12'][8:]}"
-        f"/{metadata['huc_12']}_{metadata['fpath']}_{seqnum}.rot"
+        f"/i/{scenario}/rot/"
+        f"{metadata['huc12_code'][:8]}/{metadata['huc12_code'][8:]}"
+        f"/{metadata['huc12_code']}_{metadata['fpath']}_{seqnum}.rot"
     )
     # Oh my cats, we are about to create the .rot file here
     do_rotation(scenario, zone, rotfn, row["landuse"], row["management"])
@@ -190,12 +191,13 @@ def load_flowpath_from_db(conn: Connection, fid: int) -> pd.DataFrame:
         sql_helper(
             """
         with data as (
-            select ofe, (st_dumppoints(geom)).* as g,
-            st_startpoint(geom) as stpt, st_endpoint(geom) as endpt,
-            management, landuse,
+            select ofe, (st_dumppoints(o.geom)).* as g,
+            st_startpoint(o.geom) as stpt, st_endpoint(o.geom) as endpt,
+            f.management, f.landuse,
             'DEP_'||mukey||'.SOL' as soilfile, real_length
-            from flowpath_ofes o JOIN gssurgo g on (o.gssurgo_id = g.id)
-            where flowpath = :fid)
+            from flowpath_ofe o JOIN gssurgo g on (o.gssurgo_id = g.gssurgoid)
+            JOIN field f on (o.field_id = f.field_id)
+            where o.flowpath_id = :fid)
         select ofe,
         greatest((lag(st_z(geom)) OVER (
              PARTITION by ofe ORDER by st_z(geom) DESC)
@@ -261,8 +263,8 @@ def do_flowpath(conn: Connection, scenario: int, zone: str, metadata: dict):
 
     res = {}
     res["clifile"] = metadata["climate_file"]
-    res["huc8"] = metadata["huc_12"][:8]
-    res["huc12"] = metadata["huc_12"]
+    res["huc8"] = metadata["huc12_code"][:8]
+    res["huc12"] = metadata["huc12_code"]
     res["envfn"] = (
         f"/i/{scenario}/env/{res['huc8']}/"
         f"{res['huc12']}_{metadata['fpath']}.env"
@@ -304,7 +306,7 @@ def do_flowpath(conn: Connection, scenario: int, zone: str, metadata: dict):
         res["slpdata"] = slpdata
     slpfn = (
         f"/i/{scenario}/slp/{res['huc8']}/{res['huc12'][-4:]}/"
-        f"{res['huc12']}_{metadata['fpath']}.slp"
+        f"{res['huc12']}_{metadata['huc12_fpath_num']}.slp"
     )
     # We do this ourselves do to prj2wepp limitations
     with open(slpfn, "w", encoding="ascii") as fh:
@@ -408,9 +410,13 @@ def workflow(conn: Connection, scenario: int):
     """Go main go"""
     df = pd.read_sql(
         sql_helper("""
-    SELECT ST_ymax(ST_Transform(f.geom, 4326)) as lat, fpath, fid, huc_12,
-    filepath as climate_file from flowpaths f JOIN climate_files c on
-    (f.climate_file_id = c.id) WHERE f.scenario = :scenario ORDER by huc_12 ASC
+    SELECT ST_ymax(ST_Transform(p.geom, 4326)) as lat,
+    huc12_fpath_num, p.flowpath_id, h.huc12_code,
+    filepath as climate_file
+    from flowpath p JOIN climate_file c on
+    (p.climate_file_id = c.climate_file_id)
+    JOIN huc12 h on (p.huc12_id = h.huc12_id)
+    WHERE p.scenario_id = :scenario ORDER by h.huc12_code ASC
                    """),
         conn,
         params={"scenario": get_flowpath_scenario(scenario)},
@@ -419,11 +425,13 @@ def workflow(conn: Connection, scenario: int):
         myhucs = []
         with open("myhucs.txt", encoding="utf8") as fh:
             myhucs = fh.read().split("\n")
-        LOG.info("Only running for HUC_12s in myhucs.txt")
-        df = df[df["huc_12"].isin(myhucs)]
+        LOG.info("Only running for huc12_code in myhucs.txt")
+        df = df[df["huc12_code"].isin(myhucs)]
     progress = tqdm(df.iterrows(), total=len(df.index))
     for _idx, row in progress:
-        progress.set_description(f"{row['huc_12']} {row['fpath']:04.0f}")
+        progress.set_description(
+            f"{row['huc12_code']} {row['flowpath_id']:04.0f}"
+        )
         zone = "KS_NORTH"
         if row["lat"] >= 42.5:
             zone = "IA_NORTH"
@@ -459,7 +467,7 @@ def main(scenario: int, ds: bool, so: bool):
     """Go main go"""
     KNOBS["dummy_slope"] = ds
     KNOBS["single_ofe"] = so
-    with get_sqlalchemy_conn("idep") as pgconn:
+    with get_sqlalchemy_conn("dep") as pgconn:
         workflow(pgconn, scenario)
 
 

@@ -54,25 +54,27 @@ def main(date: datetime, scenario: int, myhucs: str | None, queue: str):
         with open(myhucs, encoding="ascii") as fh:
             myhucs = [s.strip() for s in fh]
 
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         fieldsdf = pd.read_sql(
             sql_helper(
                 """
     with data as (
         select o.field_id,
-        row_number() over (partition by field_id ORDER by fpath asc),
-        substr(o.landuse, :charat, 1) as crop, f.fpath, h.huc_12,
+        row_number() over (partition by field_id ORDER by huc12_fpath_num asc),
+        substr(f.landuse, :charat, 1) as crop, f.huc12_fpath_num, h.huc12_code,
         st_pointn(st_transform(o.geom, 4326), 1) as pt, g.mukey
-        from flowpath_ofes o, flowpaths f, huc12 h, gssurgo g
-        where o.flowpath = f.fid and f.huc_12 = h.huc_12 and
-        (h.states ~* 'MN' or h.huc_12 = ANY(:graphhucs))
-        and f.scenario = 0 and o.ofe = 1 and o.gssurgo_id = g.id)
-    select field_id, fpath, huc_12, st_x(pt) as lon, st_y(pt) as lat, crop,
-    mukey
+        from flowpath_ofe o
+        JOIN flowpath f on (o.flowpath_id = f.flowpath_id)
+        JOIN huc12 h on (f.huc12_id = h.huc12_id)
+        JOIN gssurgo g on (o.gssurgo_id = g.gssurgo_id)
+        where (h.states ~* 'MN' or h.huc12_code = ANY(:graphhucs))
+        and f.scenario_id = 0 and o.ofe = 1)
+    select field_id, huc12_fpath_num, huc12_code, st_x(pt) as lon,
+    st_y(pt) as lat, crop, mukey
     from data
     where row_number = 1 and crop in ('C', 'B') {huclimit}
         """,
-                huclimit=" and huc_12 = ANY(:hucs)" if myhucs else "",
+                huclimit=" and h.huc12_code = ANY(:hucs)" if myhucs else "",
             ),
             conn,
             params={
@@ -82,7 +84,7 @@ def main(date: datetime, scenario: int, myhucs: str | None, queue: str):
             },
         )
         # Remove current entries, only for HUC12s of interest!
-        clean_database(conn, dt, fieldsdf["huc_12"].unique().tolist())
+        clean_database(conn, dt, fieldsdf["huc12_code"].unique().tolist())
     totaljobs = len(fieldsdf.index)
     connection, rabbit_config = get_rabbitmqconn()
     channel = connection.channel()
@@ -98,9 +100,9 @@ def main(date: datetime, scenario: int, myhucs: str | None, queue: str):
         payload = SweepJobPayload(
             sweepexe="sweep_dep",
             field_id=row.field_id,
-            fpath=row.fpath,
+            fpath=row.huc12_fpath_num,
             ifcfile=str(ifcfile),
-            huc_12=row.huc_12,
+            huc_12=row.huc12_code,
             crop=row.crop,
             dt=dt,
             scenario=scenario,

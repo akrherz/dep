@@ -86,9 +86,11 @@ def create_flowpath_id(cursor, scenario, huc12, fpath) -> int:
       int the value of this huc12 flowpath
     """
     cursor.execute(
-        "INSERT into flowpaths(huc_12, fpath, scenario) "
-        "values (%s, %s, %s) RETURNING fid",
-        (huc12, fpath, scenario),
+        """
+    INSERT into flowpath(huc12_id, huc12_fpath_num, scenario_id)
+    values (get_huc12_id(%s, %s), %s, %s) RETURNING flowpath_id
+        """,
+        (huc12, scenario, fpath, scenario),
     )
     return cursor.fetchone()[0]
 
@@ -202,9 +204,9 @@ def get_data(progress: tqdm, filename: str):
         fld_df["field_id"] = -1
         # Check for bad geometries
         if not fld_df["geometry"].is_valid.all():
-            LOG.info(
-                "Found %s invalid geomtries, calling buffer(0)",
-                len(fld_df.index) - fld_df["geometry"].is_valid.sum(),
+            invalid_cnt = len(fld_df.index) - fld_df["geometry"].is_valid.sum()
+            progress.write(
+                f"Found {invalid_cnt} invalid geomtries, calling buffer(0)"
             )
             fld_df["geometry"] = fld_df["geometry"].buffer(0)
         fillout_codes(fld_df)
@@ -215,23 +217,23 @@ def get_data(progress: tqdm, filename: str):
 
 def load_genlu_codes(cursor):
     """Populate dict."""
-    cursor.execute("SELECT id, label from general_landuse")
+    cursor.execute("SELECT general_landuse_id, label from general_landuse")
     for row in cursor:
         GENLU_CODES[row[1]] = row[0]
 
 
-def get_genlu_code(cursor, label):
+def get_genlu_code(cursor, label, progress: tqdm):
     """Find or create the code for this label."""
     if label not in GENLU_CODES:
-        cursor.execute("SELECT max(id) from general_landuse")
-        row = cursor.fetchone()
-        newval = 0 if row[0] is None else row[0] + 1
-        LOG.info("Inserting new general landuse code: %s [%s]", newval, label)
+        progress.write(f"Inserting new general landuse code: '{label}'")
         cursor.execute(
-            "INSERT into general_landuse(id, label) values (%s, %s)",
-            (newval, label),
+            """
+    INSERT into general_landuse(label) values (%s)
+    RETURNING general_landuse_id
+    """,
+            (label,),
         )
-        GENLU_CODES[label] = newval
+        GENLU_CODES[label] = cursor.fetchone()[0]
     return GENLU_CODES[label]
 
 
@@ -324,7 +326,8 @@ def insert_ofe(cursor, gdf, db_fid, ofe, ofe_starts):
         lastpt["len"] - firstpt["len"]
     )
     res = cursor.execute(
-        "select id, kwfact from gssurgo where fiscal_year = %s and mukey = %s",
+        "select gssurgo_id, kwfact from gssurgo "
+        "where fiscal_year = %s and mukey = %s",
         (SOILFY, int(firstpt[SOILCOL])),
     )
     gssurgo_id, kwfact = res.fetchone()
@@ -340,21 +343,20 @@ def insert_ofe(cursor, gdf, db_fid, ofe, ofe_starts):
     )
     cursor.execute(
         """
-    INSERT into flowpath_ofes (flowpath, ofe, geom, bulk_slope, max_slope,
-    gssurgo_id, management, landuse, real_length, field_id, groupid)
-    values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    INSERT into flowpath_ofe (flowpath_id, field_id, ofe, geom,
+    avg_slope_ratio, max_slope_ratio,
+    gssurgo_id, length_m, groupid)
+    values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             db_fid,
+            firstpt["field_id"],
             ofe,
             f"SRID=5070;{line.wkt}",
             bulk_slope,
             gdf["slope"].max(),
             gssurgo_id,
-            firstpt["management"],
-            firstpt["landuse"],
             (lastpt["len"] - firstpt["len"]) / 100.0,
-            firstpt["field_id"],
             groupid,
         ),
     )
@@ -364,27 +366,28 @@ def get_cli_fname_and_id(cursor, lon, lat) -> tuple[str, int]:
     """Get database entry or add one."""
     clifn = get_cli_fname(lon, lat, KNOBS["CLIMATE_SCENARIO"])
     cursor.execute(
-        "select id from climate_files where scenario = %s and filepath = %s",
+        """
+        select climate_file_id from climate_file where
+        scenario_id = %s and filepath = %s""",
         (KNOBS["CLIMATE_SCENARIO"], clifn),
     )
     if cursor.rowcount == 0:
         # Danger, we are doing lame things from the database on my laptop to
         # how it syncs to the server, so we need to manually track the next
         # sequence value
-        cursor.execute("select max(id) + 1 from climate_files")
-        cli_id = cursor.fetchone()[0]
         cursor.execute(
-            "INSERT into climate_files(id, scenario, filepath, geom) "
-            "values (%s, %s, %s, ST_Point(%s, %s, 4326))",
-            (cli_id, KNOBS["CLIMATE_SCENARIO"], clifn, lon, lat),
+            """
+            INSERT into climate_file(scenario_id, filepath, geom)
+            values (%s, %s, ST_Point(%s, %s, 4326)) RETURNING climate_file_id
+            """,
+            (KNOBS["CLIMATE_SCENARIO"], clifn, lon, lat),
         )
-    else:
-        cli_id = cursor.fetchone()[0]
+    cli_id = cursor.fetchone()[0]
     return clifn, cli_id
 
 
 def process_flowpath(
-    cursor, scenario, db_fid, df: pd.DataFrame
+    cursor, huc12: str, scenario, db_fid, df: pd.DataFrame
 ) -> pd.DataFrame:
     """Do one flowpath please."""
     # Sort along the length column, which orders the points from top
@@ -457,24 +460,23 @@ def process_flowpath(
     clifn, clifn_id = get_cli_fname_and_id(cursor, lon, lat)
     cursor.execute(
         """
-        UPDATE flowpaths SET geom = %s, irrigated = %s,
-        max_slope = %s, bulk_slope = %s, ofe_count = %s, climate_file_id = %s,
-        real_length = %s
-        WHERE fid = %s returning huc_12, fpath
+        UPDATE flowpath SET geom = %s, irrigated = %s, ofe_count = %s,
+        max_slope_ratio = %s, avg_slope_ratio = %s, climate_file_id = %s,
+        length_m = %s
+        WHERE flowpath_id = %s
         """,
         (
             f"SRID=5070;{ls.wkt}",
             bool(df["irrigated"].sum() > 0),
+            df["ofe"].max(),
             df["slope"].max(),
             (df["elev"].max() - df["elev"].min())
             / (df["len"].max() - df["len"].min()),
-            df["ofe"].max(),
             clifn_id,
             df["len"].max() / 100.0,
             db_fid,
         ),
     )
-    huc12, fpath = cursor.fetchone()
     # Write metadata file
     # grab first row to get some OFE metadata for bundling
     ofemeta = (
@@ -489,7 +491,9 @@ def process_flowpath(
     metadir = f"/i/{scenario}/meta/{huc12[:8]}/{huc12[8:]}"
     if not os.path.isdir(metadir):
         os.makedirs(metadir, exist_ok=True)
-    with open(f"/{metadir}/{huc12}_{fpath}.json", "w", encoding="ascii") as fh:
+    with open(
+        f"/{metadir}/{huc12}_{df.iloc[0]['fp']}.json", "w", encoding="ascii"
+    ) as fh:
         meta = {
             "lon": round(lon, 2),
             "lat": round(lat, 2),
@@ -503,11 +507,11 @@ def process_flowpath(
 
 def delete_flowpath(cursor, fid):
     """Delete the flowpath."""
-    cursor.execute("DELETE from flowpath_ofes where flowpath = %s", (fid,))
-    cursor.execute("DELETE from flowpaths where fid = %s", (fid,))
+    cursor.execute("DELETE from flowpath_ofe where flowpath_id = %s", (fid,))
+    cursor.execute("DELETE from flowpath where flowpath_id = %s", (fid,))
 
 
-def process_fields(cursor, scenario, huc12, fld_df):
+def process_fields(cursor, scenario, huc12, fld_df, progress):
     """Database update this information."""
     for fbndid, row in fld_df.iterrows():
         if row["geometry"] is None:
@@ -515,28 +519,31 @@ def process_fields(cursor, scenario, huc12, fld_df):
             continue
         cursor.execute(
             """
-            INSERT into fields (scenario, huc12, fbndid, acres, isag, geom,
-            management, landuse, genlu)
-            VALUES (%s, %s, %s, %s, %s, st_multi(%s), %s, %s, %s)
+            INSERT into field (scenario_id, huc12_id, huc12_fbndid_num, acres,
+            agriculture_code, geom,
+            management, landuse, general_landuse_id)
+            VALUES (%s, get_huc12_id(%s, %s),
+            %s, %s, %s, st_multi(%s), %s, %s, %s)
             RETURNING field_id
             """,
             (
                 scenario,
                 huc12,
+                scenario,
                 fbndid,
                 row["Acres"],
                 row["isAG"],
                 row["geometry"].wkt,
                 row["management"],
                 row["landuse"],
-                get_genlu_code(cursor, row["GenLU"]),
+                get_genlu_code(cursor, row["GenLU"], progress),
             ),
         )
         fld_df.at[fbndid, "field_id"] = cursor.fetchone()[0]
     PROCESSING_COUNTS["fields_inserted"] += len(fld_df.index)
 
 
-def process(cursor, scenario, huc12df, fld_df):
+def process(cursor, scenario, huc12df, fld_df, progress: tqdm):
     """Processing of a HUC12's data into the database
 
     Args:
@@ -556,7 +563,7 @@ def process(cursor, scenario, huc12df, fld_df):
     PROCESSING_COUNTS["field_operations_deleted"] += fopd
     PROCESSING_COUNTS["fields_deleted"] += fldd
     if fld_df is not None:
-        process_fields(cursor, scenario, huc12, fld_df)
+        process_fields(cursor, scenario, huc12, fld_df, progress)
     # With fields processed, we can join the field_id to the flowpath points
     huc12df["field_id"] = huc12df["FBndID"].map(fld_df["field_id"])
 
@@ -567,7 +574,7 @@ def process(cursor, scenario, huc12df, fld_df):
         # Create the flowpathid in the database
         db_fid = create_flowpath_id(cursor, scenario, huc12, flowpath_num)
         try:
-            if process_flowpath(cursor, scenario, db_fid, df) is None:
+            if process_flowpath(cursor, huc12, scenario, db_fid, df) is None:
                 delete_flowpath(cursor, db_fid)
         except Exception as exp:
             LOG.info("flowpath_num: %s hit exception", flowpath_num)
@@ -615,7 +622,7 @@ def main(
     KNOBS["CONSTANT_LANDUSE"] = cl
     KNOBS["CONSTANT_MANAGEMENT"] = cm
     KNOBS["TRUNC_GRIDORDER_AT"] = gorder
-    pgconn = get_dbconn("idep")
+    pgconn = get_dbconn("dep")
     cursor = pgconn.cursor()
     load_genlu_codes(cursor)
     datadir = os.path.join("..", "..", "data", datadir)
@@ -639,10 +646,7 @@ def main(
             huc12 = fn[-17:-5]
             if huc12 in done:
                 continue
-            # Save our work every 100 HUC12s,
-            # so to keep the database transaction
-            # at a reasonable size
-            if i > 0 and i % 100 == 0:
+            if i > 0 and i % 10 == 0:
                 pgconn.commit()
                 cursor = pgconn.cursor()
             try:
@@ -651,7 +655,7 @@ def main(
                 logging.error(exp, exc_info=True)
                 continue
             # Sometimes we get no flowpaths, so skip writing those
-            huc12 = process(cursor, scenario, fp_df, fld_df)
+            huc12 = process(cursor, scenario, fp_df, fld_df, progress)
             if not fp_df.empty:
                 fh.write(f"{huc12}\n")
             i += 1

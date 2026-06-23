@@ -1,9 +1,7 @@
 """Create a GISable PNG with DEP's domain."""
 
-# stdlib
 import subprocess
 
-# Third Party
 import geopandas as gpd
 import pyproj
 from pyiem.database import get_sqlalchemy_conn, sql_helper
@@ -13,11 +11,11 @@ from pyiem.plot.use_agg import plt
 
 def main():
     """Go Main Go."""
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         gdf = gpd.read_postgis(
             sql_helper(
                 "SELECT st_transform(simple_geom, 3857) as geo from huc12 "
-                "where scenario = 0"
+                "where scenario_id = 0"
             ),
             conn,
             geom_col="geo",

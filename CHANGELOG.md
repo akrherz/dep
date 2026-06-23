@@ -6,6 +6,8 @@
 ### API Changes
 
 - Require python 3.11+.
+- Updated to use `dep` relation from
+  [akrherz/iem-database](https://github.com/akrherz/iem-database) repo.
 
 ### New Features
 

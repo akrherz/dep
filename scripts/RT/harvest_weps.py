@@ -28,28 +28,30 @@ def main(alldates: bool, wanteddt: datetime | None):
     if wanteddt is not None:
         wanteddt = wanteddt.date()
     sql = """
-    select p.fpath, p.huc_12, o.field_id
-    from flowpaths p, flowpath_ofes o, fields f WHERE
-    p.scenario = 0 and p.fid = o.flowpath and
-    o.field_id = f.field_id and o.ofe = 1
+    select p.huc12_fpath_num, h.huc12_code, o.field_id
+    from flowpath p
+    JOIN flowpath_ofe o ON (p.flowpath_id = o.flowpath_id)
+    JOIN fields f ON (o.field_id = f.field_id)
+    JOIN huc12 h on (p.huc12_id = h.huc12_id) WHERE
+    p.scenario_id = 0 and o.ofe = 1
     """
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         fieldsdf = pd.read_sql(
             sql_helper(sql),
             conn,
         )
     progress = tqdm(fieldsdf.itertuples(), total=len(fieldsdf.index))
     inserts = 0
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         for row in progress:
             progress.set_description(
-                f"{row.huc_12}_{row.fpath:04.0f} {inserts}"
+                f"{row.huc12_code}_{row.huc12_fpath_num:04.0f} {inserts}"
             )
             outfn = (
                 Path("/i/0/weps")
-                / f"{row.huc_12[:8]}"
-                / f"{row.huc_12[8:]}"
-                / f"{row.huc_12}_{row.fpath}.out"
+                / f"{row.huc12_code[:8]}"
+                / f"{row.huc12_code[8:]}"
+                / f"{row.huc12_code}_{row.huc12_fpath_num}.out"
             )
             if not outfn.exists():
                 progress.write(f"Missing {outfn}")
@@ -72,9 +74,10 @@ def main(alldates: bool, wanteddt: datetime | None):
                     inserts += 1
                     conn.execute(
                         sql_helper(
-                            "insert into {table} (field_id, scenario, valid, "
-                            "erosion_kgm2, max_wmps, drct) values (:fld, 0, "
-                            ":valid, :erosion, :max_wmps, :drct)",
+                            """
+    insert into {table} (field_id, scenario_id, valid,
+    erosion_kgm2, max_wind_speed_mps, drct) values (:fld, 0,
+    :valid, :erosion, :max_wmps, :drct)""",
                             table=f"field_wind_erosion_results_{dt.year}",
                         ),
                         {

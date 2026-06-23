@@ -1,10 +1,10 @@
 """Query CSU CSIP for its soil file for WEPS.
 
 DEP specific query:
-    select distinct g.mukey, p.cokey from flowpaths f, flowpath_ofes o,
+    select distinct g.mukey, p.cokey from flowpath f, flowpath_ofe o,
     gssurgo g, gssurgo25.dep_soilparameters p where
-    scenario = 0 and o.flowpath = f.fid
-    and o.gssurgo_id = g.id and g.mukey = p.mukey::int
+    scenario_id = 0 and o.flowpath_id = f.flowpath_id
+    and o.gssurgo_id = g.gssurgo_id and g.mukey = p.mukey::int
 """
 
 from pathlib import Path
@@ -67,7 +67,7 @@ def get_url_by_cokey(cokey: str) -> str | None:
 def main():
     """Go Main"""
     # Appears web service has GSSURGO 25, so we can cross-ref DEP here.
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         depsoils = pd.read_sql(
             sql_helper("""
             SELECT mukey, max(cokey) as cokey from gssurgo25.dep_soilparameters
