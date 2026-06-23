@@ -86,7 +86,7 @@ def test_do_huc12():
             conn, -1, date(2025, 6, 13), "070801050902"
         )
     total_acres = df["acres"].sum()
-    assert len(df.index) == 306
+    assert len(df.index) == 301
     assert acres_planted >= (total_acres * 0.1)
 
 

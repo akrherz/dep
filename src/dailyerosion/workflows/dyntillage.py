@@ -198,7 +198,7 @@ def do_huc12(
         return df, 0, 0
 
     # There is an entry per OFE + field combination, but we only want 1
-    fields = df.groupby("fbndid").first().copy()
+    fields = df.groupby("huc12_fbndid_num").first().copy()
 
     # We could be re-running for a given date, so we first total up the acres
     acres_planted = fields[fields["plant"] == dt]["acres"].sum()
