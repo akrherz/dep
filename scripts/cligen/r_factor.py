@@ -20,15 +20,15 @@ from dailyerosion.rfactor import compute_rfactor_from_cli
 def plot():
     """Plot."""
     df2 = pd.read_csv("/tmp/data.csv", dtype={"huc12": str}).set_index("huc12")
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         df = gpd.read_postgis(
             sql_helper(
-                "SELECT huc_12, ST_Transform(simple_geom, 4326) as geom "
-                "from huc12 WHERE scenario = 0"
+                "SELECT huc12_code, ST_Transform(simple_geom, 4326) as geom "
+                "from huc12 WHERE scenario_id = 0"
             ),
             conn,
             geom_col="geom",
-            index_col="huc_12",
+            index_col="huc12_code",
         )
     minx, miny, maxx, maxy = df["geom"].total_bounds
     colname = "rfactor_yr_avg"
@@ -80,14 +80,14 @@ def job(args) -> pd.DataFrame:
 def dump_data():
     """Go main Go."""
     inserts = 0
-    with get_sqlalchemy_conn("idep") as conn, Pool() as pool:
+    with get_sqlalchemy_conn("dep") as conn, Pool() as pool:
         clidf = pd.read_sql(
             """
-            SELECT id, filepath from climate_files where
-            scenario = 0
+            SELECT climate_file_id, filepath from climate_file where
+            scenario_id = 0
         """,
             conn,
-            index_col="id",
+            index_col="climate_file_id",
         )
         for clid, resdf in tqdm(
             pool.imap(job, clidf.iterrows()), total=len(clidf)

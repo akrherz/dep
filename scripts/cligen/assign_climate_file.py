@@ -13,19 +13,20 @@ LOG = logger()
 def main(argv):
     """Go Main Go."""
     scenario = int(argv[1])
-    pgconn = get_dbconn("idep")
+    pgconn = get_dbconn("dep")
     cursor = pgconn.cursor()
     cursor2 = pgconn.cursor()
     # Get the climate_scenario
     cursor.execute(
-        "SELECT climate_scenario from scenarios where id = %s", (scenario,)
+        "SELECT climate_scenario from scenario where scenario_id = %s",
+        (scenario,),
     )
     clscenario = cursor.fetchone()[0]
     cursor.execute(
         """
         SELECT st_x(st_pointn(st_transform(geom, 4326), 1)),
-        st_y(st_pointn(st_transform(geom, 4326), 1)), fid
-        from flowpaths WHERE scenario = %s and climate_file_id is null
+        st_y(st_pointn(st_transform(geom, 4326), 1)), flowpath_id
+        from flowpath WHERE scenario_id = %s and climate_file_id is null
     """,
         (scenario,),
     )
@@ -33,9 +34,9 @@ def main(argv):
     for row in cursor:
         fn = get_cli_fname(row[0], row[1], clscenario)
         cursor2.execute(
-            "update flowpaths SET "
-            "climate_file_id = (select id from climate_files "
-            "where filepath = %s and scenario = %s) WHERE fid = %s",
+            "update flowpath SET "
+            "climate_file_id = (select climate_file_id from climate_file "
+            "where filepath = %s and scenario_id = %s) WHERE flowpath_id = %s",
             (fn, clscenario, row[2]),
         )
         updated += 1
