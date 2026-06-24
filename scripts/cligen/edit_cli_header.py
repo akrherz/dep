@@ -1,6 +1,7 @@
 """Keep the CLI file headers in sync."""
 
 import os
+from pathlib import Path
 
 import click
 import numpy as np
@@ -42,19 +43,19 @@ def monthly_avgs(lon, lat, domain):
     )
 
 
-def get_elevation(lon, lat):
+def get_elevation(lon: float, lat: float) -> float:
     """Use opentopo."""
     # API services have limits, so alas
-    # http://research.jisao.washington.edu/data_sets/elevation/
-    with ncopen("/tmp/elev.0.25-deg.nc") as nc:
-        lons = nc.variables["lon"]  # deg E
+    # https://zenodo.org/records/14537811
+    ncfn = Path(__file__).parent / "GMTED2010_median_30arcsec.nc4"
+    if not ncfn.is_file():
+        raise FileNotFoundError(f"Missing {ncfn}, download it to cwd!")
+    with ncopen(ncfn) as nc:
+        lons = nc.variables["lon"]  # deg E already -180 to 180
         lats = nc.variables["lat"]
-        if lon < 0:
-            # Convert to 0-360
-            lon += 360
         i = np.digitize(lon, lons)
         j = np.digitize(lat, lats)
-        return nc.variables["data"][0, j, i]
+        return nc.variables["surface_altitude_median"][j, i]
 
 
 def process(lon: float, lat: float, clifn: str, domain: str):
@@ -65,7 +66,7 @@ def process(lon: float, lat: float, clifn: str, domain: str):
     lines[2] = f"Station: Daily Erosion Project 0.01deg Grid Cell {REV}\n"
     # Set Lat/Lon from filename
     tokens = lines[4].strip().split()
-    # Set Elevation via some web service
+    # Get elevation from a reference netcdf file
     elev = get_elevation(lon, lat)
     lines[4] = (
         f"{lat:.2f}  {lon:.2f}  {elev:.0f} "
