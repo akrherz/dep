@@ -37,8 +37,9 @@ def main(year: int):
         select climate_file_id, avg(rfactor) as rr from
         climate_file_yearly_summary
         GROUP by climate_file_id)
-    select geom, rr from climate_files f, climo c
-    WHERE f.id = c.climate_file_id and f.scenario = 0
+    select geom, rr from
+    climate_file f JOIN climo c on (f.climate_file_id = c.climate_file_id)
+    WHERE f.scenario_id = 0
 """),
             pgconn,
             params={"year": year},

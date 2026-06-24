@@ -169,7 +169,7 @@ def rotation_magic(scenario, zone, seqnum, row, metadata):
     rotfn = (
         f"/i/{scenario}/rot/"
         f"{metadata['huc12_code'][:8]}/{metadata['huc12_code'][8:]}"
-        f"/{metadata['huc12_code']}_{metadata['fpath']}_{seqnum}.rot"
+        f"/{metadata['huc12_code']}_{metadata['huc12_fpath_num']}_{seqnum}.rot"
     )
     # Oh my cats, we are about to create the .rot file here
     do_rotation(scenario, zone, rotfn, row["landuse"], row["management"])
@@ -185,7 +185,7 @@ def compute_aspect(x0, y0, x1, y1):
     return degrees(rads)
 
 
-def load_flowpath_from_db(conn: Connection, fid: int) -> pd.DataFrame:
+def load_flowpath_from_db(conn: Connection, flowpath_id: int) -> pd.DataFrame:
     """Fetch me the flowpath."""
     flowpath = pd.read_sql(
         sql_helper(
@@ -194,25 +194,26 @@ def load_flowpath_from_db(conn: Connection, fid: int) -> pd.DataFrame:
             select ofe, (st_dumppoints(o.geom)).* as g,
             st_startpoint(o.geom) as stpt, st_endpoint(o.geom) as endpt,
             f.management, f.landuse,
-            'DEP_'||mukey||'.SOL' as soilfile, real_length
-            from flowpath_ofe o JOIN gssurgo g on (o.gssurgo_id = g.gssurgoid)
+            'DEP_'||mukey||'.SOL' as soilfile, length_m
+            from flowpath_ofe o JOIN gssurgo g on (o.gssurgo_id = g.gssurgo_id)
             JOIN field f on (o.field_id = f.field_id)
-            where o.flowpath_id = :fid)
+            where o.flowpath_id = :flowpath_id)
         select ofe,
         greatest((lag(st_z(geom)) OVER (
              PARTITION by ofe ORDER by st_z(geom) DESC)
         - st_z(geom)) / st_distance(geom, lag(geom) OVER (
              PARTITION by ofe ORDER by st_z(geom) DESC)
-        ), :min_slope) as slope, st_z(geom), st_distance(geom, stpt) as length,
+        ), :min_slope) as slope, st_z(geom),
+        st_distance(geom, stpt) as length,
         st_x(stpt) as start_x, st_x(endpt) as end_x,
         st_y(stpt) as start_y, st_y(endpt) as end_y,
-        real_length, soilfile, management, landuse
+        length_m, soilfile, management, landuse
         from data
         ORDER by ofe asc, length asc
     """
         ),
         conn,
-        params={"fid": fid, "min_slope": MIN_SLOPE},
+        params={"flowpath_id": flowpath_id, "min_slope": MIN_SLOPE},
         index_col=None,
     )
     if KNOBS["single_ofe"] and flowpath["ofe"].max() > 1:
@@ -221,9 +222,9 @@ def load_flowpath_from_db(conn: Connection, fid: int) -> pd.DataFrame:
         sample_row = flowpath[
             flowpath["length"] == flowpath["length"].max()
         ].iloc[0]
-        # real_length was a hack storage per OFE
-        real_length = flowpath.groupby("ofe").first()["real_length"].sum()
-        flowpath["real_length"] = real_length
+        # length_m was a hack storage per OFE
+        length_m = flowpath.groupby("ofe").first()["length_m"].sum()
+        flowpath["length_m"] = length_m
         # Everything is now OFE 1
         flowpath["ofe"] = 1
         # Copy columns to hard code things
@@ -259,7 +260,7 @@ def load_flowpath_from_db(conn: Connection, fid: int) -> pd.DataFrame:
 def do_flowpath(conn: Connection, scenario: int, zone: str, metadata: dict):
     """Process a given flowpathid"""
     # I need bad soilfiles so that the length can be computed
-    df = load_flowpath_from_db(conn, metadata["fid"])
+    df = load_flowpath_from_db(conn, metadata["flowpath_id"])
 
     res = {}
     res["clifile"] = metadata["climate_file"]
@@ -267,7 +268,7 @@ def do_flowpath(conn: Connection, scenario: int, zone: str, metadata: dict):
     res["huc12"] = metadata["huc12_code"]
     res["envfn"] = (
         f"/i/{scenario}/env/{res['huc8']}/"
-        f"{res['huc12']}_{metadata['fpath']}.env"
+        f"{res['huc12']}_{metadata['huc12_fpath_num']}.env"
     )
     res["date"] = datetime.now()
     res["aspect"] = compute_aspect(
@@ -278,10 +279,10 @@ def do_flowpath(conn: Connection, scenario: int, zone: str, metadata: dict):
     )
     res["prj_fn"] = (
         f"/i/{scenario}/prj/{res['huc8']}/{res['huc12'][-4:]}/"
-        f"{res['huc12']}_{metadata['fpath']}.prj"
+        f"{res['huc12']}_{metadata['huc12_fpath_num']}.prj"
     )
     # Add up the OFEs to get the total length
-    res["length"] = df.groupby("ofe").first()["real_length"].sum()
+    res["length"] = df.groupby("ofe").first()["length_m"].sum()
 
     # Slope data
     # Here be dragons: dailyerosion/dep#79 dailyerosion/dep#158
@@ -289,6 +290,8 @@ def do_flowpath(conn: Connection, scenario: int, zone: str, metadata: dict):
     # prj2wepp is doing with the slope files and prescribe them below
     slpdata = ""
     for _ofe, gdf in df.groupby("ofe"):
+        # This is trickier that it should be, but we want a relative value.
+        # length_m may not be equal to the sum of the parts.
         lens = gdf["length"].to_numpy() / gdf["length"].values[-1]
         slopes = gdf["slope"].to_numpy().copy()
         # First value is null, so we just repeat it
@@ -297,8 +300,7 @@ def do_flowpath(conn: Connection, scenario: int, zone: str, metadata: dict):
             f"{r:.6f},{s:.6f}" for r, s in zip(lens, slopes, strict=False)
         ]
         slpdata += (
-            f"{len(lens)} {gdf.iloc[0]['real_length']:.4f}\n"
-            f"{' '.join(tokens)}\n"
+            f"{len(lens)} {gdf.iloc[0]['length_m']:.4f}\n{' '.join(tokens)}\n"
         )
     if KNOBS["dummy_slope"]:
         res["slpdata"] = f"2 {res['length']:.4f}\n0.00, 0.01 1.00, 0.01\n"
@@ -328,7 +330,7 @@ def do_flowpath(conn: Connection, scenario: int, zone: str, metadata: dict):
     s = 1
     for _, row in df.groupby("ofe").first().iterrows():
         soilfile = row["soilfile"]
-        soillength = row["real_length"]
+        soillength = row["length_m"]
         res["soils"] += (
             f"    soil{s} {{\n"
             f"Distance = {soillength:.3f}\n"

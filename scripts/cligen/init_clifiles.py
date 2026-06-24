@@ -52,9 +52,7 @@ def main(domain: str):
     nc = ncopen("/tmp/IMERG_land_sea_mask.nc")
     mask = nc.variables["landseamask"][:]
     nc.close()
-    conn, cursor = get_dbconnc(
-        "idep" if domain == "conus" else f"dep_{domain}"
-    )
+    conn, cursor = get_dbconnc("dep" if domain == "conus" else f"dep_{domain}")
     progress = tqdm(np.arange(left, nav.right_edge + 0.1, 0.1))
     for lon in progress:
         for lat in np.arange(bottom, nav.top_edge + 0.1, 0.1):
@@ -82,7 +80,7 @@ def main(domain: str):
             # create database entry
             cursor.execute(
                 """
-                INSERT into climate_files (scenario, filepath, geom)
+                INSERT into climate_file (scenario_id, filepath, geom)
                 VALUES (%s, %s, ST_Point(%s, %s, 4326))
             """,
                 (SCENARIO, fn, lon, lat),
