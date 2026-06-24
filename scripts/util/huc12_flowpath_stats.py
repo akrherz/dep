@@ -7,15 +7,17 @@ from pyiem.database import get_dbconn
 def main():
     """Go Main Go."""
     df = pd.read_csv("isbi.csv")
-    dbconn = get_dbconn("idep")
+    dbconn = get_dbconn("dep")
     cursor = dbconn.cursor()
     for idx, row in df.iterrows():
         huc12 = f"{row['huc12Code']:012.0f}"
         cursor.execute(
-            "SELECT count(*), max(bulk_slope), max(max_slope), "
-            "avg(bulk_slope), avg(max_slope), stddev(bulk_slope), "
-            "stddev(max_slope) from flowpaths where "
-            "scenario = 0 and huc_12 = %s",
+            """
+    SELECT count(*), max(avg_slope_ratio), max(max_slope_ratio),
+    avg(avg_slope_ratio), avg(max_slope_ratio), stddev(avg_slope_ratio),
+    stddev(max_slope_ratio) from flowpath p
+    JOIN huc12 h on (p.huc12_id = h.huc12_id) where
+    p.scenario_id = 0 and h.huc12_code = %s""",
             (huc12,),
         )
         data = cursor.fetchone()

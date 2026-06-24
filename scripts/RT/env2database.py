@@ -136,8 +136,10 @@ def load_precip(dates, huc12s):
     """
     # 1. Build GeoPandas DataFrame of HUC12s of interest
     huc12df = gpd.GeoDataFrame.from_postgis(
-        "SELECT huc12_code, ST_Transform(simple_geom, 4326) as geo from huc12 "
-        "WHERE scenario_id = 0",
+        """
+    SELECT huc12_code, ST_Transform(simple_geom, 4326) as geo from huc12
+    WHERE scenario_id = 0
+        """,
         get_dbconnstr("dep"),
         index_col="huc12_code",
         geom_col="geo",
@@ -215,7 +217,7 @@ def delete_previous_entries(icursor, scenario, huc12, dates):
         )
     else:
         icursor.execute(
-            """"
+            """
     DELETE from water_results_by_huc12 WHERE valid = ANY(%s) and
     scenario_id = %s and huc12_id = get_huc12_id(%s, %s)
             """,
