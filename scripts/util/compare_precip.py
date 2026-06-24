@@ -14,7 +14,7 @@ def two(year):
     """Compare yearly totals in a scatter plot"""
     coop = get_dbconn("coop")
     ccursor = coop.cursor()
-    idep = get_dbconn("idep")
+    idep = get_dbconn("dep")
     icursor = idep.cursor()
 
     ccursor.execute(
@@ -36,10 +36,10 @@ def two(year):
         lat = nt.sts[station]["lat"]
         icursor.execute(
             """
-            select huc_12 from huc12
+            select huc12_code from huc12
             where ST_Contains(geom,
-            ST_Transform(ST_SetSRID(ST_Point(%s, %s), 4326), 5070))
-            and scenario = 0
+            ST_Transform(ST_Point(%s, %s, 4326), 5070))
+            and scenario_id = 0
         """,
             (lon, lat),
         )
@@ -48,8 +48,9 @@ def two(year):
         huc12 = icursor.fetchone()[0]
         icursor.execute(
             """
-        select sum(qc_precip) from results_by_huc12
-        WHERE valid between %s and %s and huc_12 = %s and scenario = 0
+        select sum(qc_precip_mm) from
+        water_results_by_huc12 w JOIN huc12 h ON (w.huc12_id = h.huc12_id)
+        WHERE valid between %s and %s and huc12_code = %s and w.scenario_id = 0
         """,
             (date(year, 1, 1), date(year, 12, 31), huc12),
         )
@@ -98,7 +99,7 @@ def one():
     """One."""
     iem = get_dbconn("iem")
 
-    idep = get_dbconn("idep")
+    idep = get_dbconn("dep")
     icursor = idep.cursor()
 
     # Get obs
@@ -115,17 +116,19 @@ def one():
     # Get idep
     # Due to join issues, we hardcode the huc12 count
     icursor.execute(
-        "SELECT count(*) from huc12 where states = 'IA' and scenario =0"
+        "SELECT count(*) from huc12 where states = 'IA' and scenario_id = 0"
     )
     huccount = icursor.fetchone()[0]
     df2 = pd.read_sql(
         """
         WITH iahuc12 as (
-            SELECT huc_12 from huc12 where states = 'IA' and scenario = 0
+            SELECT huc12_id from huc12
+            where states = 'IA' and scenario_id = 0
         )
-        SELECT valid, sum(qc_precip) / 25.4 as precip
-        from results_by_huc12 r JOIN iahuc12 i on (r.huc_12 = i.huc_12)
-        WHERE r.scenario = 0 and r.valid >= '2014-01-01' and
+        SELECT valid, sum(qc_precip_mm) / 25.4 as precip
+        from water_results_by_huc12 r
+        JOIN iahuc12 i on (r.huc12_id = i.huc12_id)
+        WHERE r.scenario_id = 0 and r.valid >= '2014-01-01' and
         r.valid < '2015-01-01' GROUP by valid
       """,
         idep,

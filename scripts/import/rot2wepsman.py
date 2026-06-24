@@ -28,17 +28,17 @@ def do_flowpath(
     """Process a given flowpath."""
     # Get the rotation file for OFE1, since we only process it.
     rotfn = (
-        f"/i/{scenario}/rot/{metadata['huc_12'][:8]}/{metadata['huc_12'][8:]}"
-        f"/{metadata['huc_12']}_{metadata['fpath']}_1.rot"
+        f"/i/{scenario}/rot/{metadata['huc12_code'][:8]}/{metadata['huc12_code'][8:]}"
+        f"/{metadata['huc12_code']}_{metadata['huc12_fpath_num']}_1.rot"
     )
     # Our generated man file.
     wepsfn = (
         Path("/i")
         / f"{scenario}"
         / "weps_man"
-        / f"{metadata['huc_12'][:8]}"
-        / f"{metadata['huc_12'][8:]}"
-        / f"{metadata['huc_12']}_{metadata['fpath']}.man"
+        / f"{metadata['huc12_code'][:8]}"
+        / f"{metadata['huc12_code'][8:]}"
+        / f"{metadata['huc12_code']}_{metadata['huc12_fpath_num']}.man"
     )
     if not wepsfn.parent.exists():
         wepsfn.parent.mkdir(parents=True)
@@ -110,7 +110,9 @@ def workflow(df: pd.DataFrame, scenario: int):
         with open(fn) as fh:
             weps_operations[fn.split("/")[1][:-4]] = fh.read().strip()
     for _idx, row in progress:
-        progress.set_description(f"{row['huc_12']} {row['fpath']:04.0f}")
+        progress.set_description(
+            f"{row['huc12_code']} {row['huc12_fpath_num']:04.0f}"
+        )
         do_flowpath(scenario, weps_operations, row)
 
 
@@ -124,6 +126,7 @@ def main(scenario: int):
         SELECT huc12_fpath_num, huc12_code
         from flowpath p JOIN flowpath_ofe o on (p.flowpath_id = o.flowpath_id)
         JOIN field f on (o.field_id = f.field_id)
+        JOIN huc12 h on (h.huc12_id = f.huc12_id)
         WHERE p.scenario_id = :scenario and (
         strpos(landuse, 'C') > 0 or strpos(landuse, 'B') > 0
         )

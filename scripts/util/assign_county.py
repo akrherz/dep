@@ -11,16 +11,17 @@ def main():
     postgis = get_dbconn("postgis")
     pcursor = postgis.cursor()
 
-    dep = get_dbconn("idep")
+    dep = get_dbconn("dep")
     cursor = dep.cursor()
     cursor2 = dep.cursor()
 
     cursor.execute(
         """with data as (
-        SELECT ST_Transform(ST_Centroid(geom), 4326) as geo, ctid, huc_12
+        SELECT ST_Transform(ST_Centroid(geom), 4326) as geo,
+        huc12_id, huc12_code
         from huc12 where ugc is null)
 
-        SELECT ST_x(geo), ST_y(geo), ctid, huc_12 from data
+        SELECT ST_x(geo), ST_y(geo), huc12_id, huc12_code from data
     """
     )
     for row in cursor:
@@ -37,7 +38,7 @@ def main():
             continue
         ugc = pcursor.fetchone()[0]
         cursor2.execute(
-            "UPDATE huc12 SET ugc = %s where ctid = %s",
+            "UPDATE huc12 SET ugc = %s where huc12_id = %s",
             (ugc, row[2]),
         )
 

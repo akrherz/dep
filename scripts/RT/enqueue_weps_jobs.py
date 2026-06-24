@@ -73,28 +73,32 @@ def main(
                 """
     with data as (
         select o.field_id,
-        row_number() over (partition by field_id ORDER by huc12_fpath_num asc),
-        substr(f.landuse, :charat, 1) as crop, f.huc12_fpath_num, h.huc12_code,
+        row_number() over (
+            partition by o.field_id ORDER by huc12_fpath_num asc),
+        substr(f.landuse, :charat, 1) as crop, p.huc12_fpath_num, h.huc12_code,
         st_pointn(st_transform(o.geom, 4326), 1) as pt, c.filepath as clifile,
         g.mukey
         from flowpath_ofe o
-        JOIN flowpath f ON (o.field_id = f.field_id)
+        JOIN flowpath p on (o.flowpath_id = p.flowpath_id)
+        JOIN field f ON (o.field_id = f.field_id)
         JOIN huc12 h on (f.huc12_id = h.huc12_id)
-        JOIN climate_file c on (f.climate_file_id = c.climate_file_id)
+        JOIN climate_file c on (p.climate_file_id = c.climate_file_id)
         JOIN gssurgo g on (o.gssurgo_id = g.gssurgo_id)
         where (h.states ~* 'MN' or h.huc12_code = ANY(:graphhucs))
-        and f.scenario_id = 0 and o.ofe = 1)
+        and f.scenario_id = :scenario_id and p.scenario_id = :scenario_id
+        and o.ofe = 1)
     select field_id, huc12_fpath_num, huc12_code, st_x(pt) as lon,
     st_y(pt) as lat, crop, clifile, mukey from data
     where row_number = 1 and crop in ('C', 'B') {huclimit}
         """,
-                huclimit=" and h.huc12_code = ANY(:hucs)" if myhucs else "",
+                huclimit=" and huc12_code = ANY(:hucs)" if myhucs else "",
             ),
             conn,
             params={
                 "graphhucs": GRAPH_HUC12,
                 "hucs": myhucs,
                 "charat": dt.year - 2007 + 1,
+                "scenario_id": scenario,
             },
         )
     if fieldsdf.empty:
@@ -109,21 +113,25 @@ def main(
     sts = datetime.now()
     # When we are for_sweep mode, we hopefully do not need real wind data
     windfile = "/i/0/wind/zeros.win"
-
+    missing_soilfile_cnt = 0
     for row in fieldsdf.itertuples():
         if not for_sweep:
             gid = f"{get_gid(row.lon, row.lat):06.0f}"
             windfile = f"/i/0/wind/{gid[:3]}/{gid}.win"
+        # Presently, the database is actually at FY2025, but we don't have
+        # a source for the files.  Thankfully, there is only a small variance
+        # between the releases.
         ifcfile = Path(f"/i/0/weps_soil_fy2024/{row.mukey}.ifc")
         if not ifcfile.exists():
+            missing_soilfile_cnt += 1
             ifcfile = Path("/i/0/weps_test/Bearden_I119A_70_SICL.ifc")
         payload = WEPSJobPayload(
             wepsexe="weps_dep",
             for_sweep=for_sweep,
             windfile=windfile,
             manfile=(
-                f"/i/0/weps_man/{row.huc_12[:8]}/{row.huc_12[8:]}/"
-                f"{row.huc_12}_{row.fpath}.man"
+                f"/i/0/weps_man/{row.huc12_code[:8]}/{row.huc12_code[8:]}/"
+                f"{row.huc12_code}_{row.huc12_fpath_num}.man"
             ),
             ifcfile=str(ifcfile),
             field_id=row.field_id,
@@ -146,6 +154,11 @@ def main(
                 delivery_mode=pika.DeliveryMode.Persistent,
             ),
         )
+    LOG.warning(
+        "Enqueued %s jobs, %s missing soil files",
+        totaljobs,
+        missing_soilfile_cnt,
+    )
     # Wait a few seconds for the dust to settle
     time.sleep(10)
     connection.close()

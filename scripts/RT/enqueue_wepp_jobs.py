@@ -55,7 +55,7 @@ def main(scenario: int, runerrors: bool, myhucs: str | None, queue: str):
         res = conn.execute(
             sql_helper(
                 """
-    SELECT flowpath_scenario from scenarios where scenario_id = :scenario
+    SELECT flowpath_scenario from scenario where scenario_id = :scenario
     """
             ),
             {"scenario": scenario},

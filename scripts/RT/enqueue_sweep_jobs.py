@@ -20,14 +20,18 @@ from dailyerosion.workflows.sweeprun import SweepJobPayload
 LOG = logger()
 
 
-def clean_database(conn: Connection, dt, hucs):
+def clean_database(conn: Connection, dt, hucs: list):
     """Remove current entries."""
+    hlimit = "" if not hucs else " and h.huc12_code = ANY(:hucs) "
     res = conn.execute(
-        sql_helper("""
-    delete from field_wind_erosion_results r USING fields f
-    WHERE r.valid = :dt and r.field_id = f.field_id and f.huc12 = ANY(:hucs)
-    and f.scenario = 0
-                   """),
+        sql_helper(
+            """
+    delete from field_wind_erosion_results r USING field f, huc12 h
+    WHERE r.valid = :dt and r.field_id = f.field_id {hlimit}
+    and f.huc12_id = h.huc12_id and f.scenario_id = 0
+                   """,
+            hlimit=hlimit,
+        ),
         {"dt": dt, "hucs": hucs},
     )
     loglvl = LOG.info if res.rowcount == 0 else LOG.warning
@@ -60,21 +64,23 @@ def main(date: datetime, scenario: int, myhucs: str | None, queue: str):
                 """
     with data as (
         select o.field_id,
-        row_number() over (partition by field_id ORDER by huc12_fpath_num asc),
-        substr(f.landuse, :charat, 1) as crop, f.huc12_fpath_num, h.huc12_code,
+        row_number() over (
+            partition by f.field_id ORDER by p.huc12_fpath_num asc),
+        substr(f.landuse, :charat, 1) as crop, p.huc12_fpath_num, h.huc12_code,
         st_pointn(st_transform(o.geom, 4326), 1) as pt, g.mukey
         from flowpath_ofe o
-        JOIN flowpath f on (o.flowpath_id = f.flowpath_id)
-        JOIN huc12 h on (f.huc12_id = h.huc12_id)
+        JOIN flowpath p on (o.flowpath_id = p.flowpath_id)
+        JOIN field f on (f.field_id = o.field_id)
+        JOIN huc12 h on (p.huc12_id = h.huc12_id)
         JOIN gssurgo g on (o.gssurgo_id = g.gssurgo_id)
         where (h.states ~* 'MN' or h.huc12_code = ANY(:graphhucs))
-        and f.scenario_id = 0 and o.ofe = 1)
+        and p.scenario_id = 0 and o.ofe = 1)
     select field_id, huc12_fpath_num, huc12_code, st_x(pt) as lon,
     st_y(pt) as lat, crop, mukey
     from data
     where row_number = 1 and crop in ('C', 'B') {huclimit}
         """,
-                huclimit=" and h.huc12_code = ANY(:hucs)" if myhucs else "",
+                huclimit=" and huc12_code = ANY(:hucs)" if myhucs else "",
             ),
             conn,
             params={
@@ -83,8 +89,14 @@ def main(date: datetime, scenario: int, myhucs: str | None, queue: str):
                 "charat": dt.year - 2007 + 1,
             },
         )
+        if fieldsdf.empty:
+            LOG.warning("No fields found for %s, aborting.", dt)
+            return
         # Remove current entries, only for HUC12s of interest!
-        clean_database(conn, dt, fieldsdf["huc12_code"].unique().tolist())
+        dbclean_limit_huc12 = []
+        if myhucs:
+            dbclean_limit_huc12 = fieldsdf["huc12_code"].unique().tolist()
+        clean_database(conn, dt, dbclean_limit_huc12)
     totaljobs = len(fieldsdf.index)
     connection, rabbit_config = get_rabbitmqconn()
     channel = connection.channel()
@@ -92,10 +104,11 @@ def main(date: datetime, scenario: int, myhucs: str | None, queue: str):
     # This is idempotent - safe to declare multiple times
     channel.queue_declare(queue=queue, durable=True)
     sts = datetime.now()
-
+    missing_soilfiles = 0
     for row in fieldsdf.itertuples():
         ifcfile = Path(f"/i/0/weps_soil_fy2024/{row.mukey}.ifc")
         if not ifcfile.exists():
+            missing_soilfiles += 1
             ifcfile = Path("/i/0/weps_test/Bearden_I119A_70_SICL.ifc")
         payload = SweepJobPayload(
             sweepexe="sweep_dep",
@@ -120,6 +133,9 @@ def main(date: datetime, scenario: int, myhucs: str | None, queue: str):
                 delivery_mode=pika.DeliveryMode.Persistent,
             ),
         )
+    LOG.warning(
+        "Enqueued %s jobs, %s missing soil files", totaljobs, missing_soilfiles
+    )
     # Wait a few seconds for the dust to settle
     time.sleep(10)
     connection.close()

@@ -12,8 +12,9 @@ def do_delete(conn, huc12, scenario):
     params = {"huc12": huc12, "scenario": scenario}
     res = conn.execute(
         sql_helper("""
-    delete from flowpath_ofes pts using flowpaths f where
-    pts.flowpath = f.fid and f.huc_12 = :huc12 and f.scenario = :scenario
+    delete from flowpath_ofe o using flowpath p, huc12 h where
+    o.flowpath_id = p.flowpath_id and p.huc12_id = h.huc12_id and
+    h.huc12_code = :huc12 and p.scenario_id = :scenario
     """),
         params,
     )
@@ -21,26 +22,42 @@ def do_delete(conn, huc12, scenario):
 
     res = conn.execute(
         sql_helper("""
-    delete from field_operations o using fields f where
-    o.field_id = f.field_id and f.huc12 = :huc12 and f.scenario = :scenario
+    delete from field_operations o using field f, huc12 h where
+    o.field_id = f.field_id and f.huc12_id = h.huc12_id and
+    h.huc12_code = :huc12 and f.scenario_id = :scenario
     """),
         params,
     )
     print(f"removed {res.rowcount} field_operations")
 
-    for table in ["flowpaths", "results_by_huc12", "huc12", "fields"]:
-        hcol = "huc_12" if table != "fields" else "huc12"
-        res = conn.execute(
-            sql_helper(
-                """
-        DELETE from {table} where {hcol} = :huc12 and scenario = :scenario
-        """,
-                table=table,
-                hcol=hcol,
-            ),
-            params,
-        )
-        print(f"removed {res.rowcount} from {table}")
+    res = conn.execute(
+        sql_helper("""
+    delete from field f using huc12 h where
+    f.huc12_id = h.huc12_id and
+    h.huc12_code = :huc12 and f.scenario_id = :scenario
+    """),
+        params,
+    )
+    print(f"removed {res.rowcount} fields")
+
+    res = conn.execute(
+        sql_helper("""
+    delete from flowpath p using huc12 h where
+    p.huc12_id = h.huc12_id and
+    h.huc12_code = :huc12 and p.scenario_id = :scenario
+    """),
+        params,
+    )
+    print(f"removed {res.rowcount} flowpaths")
+
+    res = conn.execute(
+        sql_helper("""
+    delete from huc12 where
+    huc12_code = :huc12 and scenario_id = :scenario
+    """),
+        params,
+    )
+    print(f"removed {res.rowcount} huc12 entries")
 
     # Remove some files
     for prefix in "env error man prj run slp sol wb".split():
@@ -63,7 +80,7 @@ def do_delete(conn, huc12, scenario):
 @click.option("--scenario", required=True, help="Scenario", type=int)
 def main(huc12: str, scenario: int):
     """Go Main Go"""
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         do_delete(conn, huc12, scenario)
         conn.commit()
 
