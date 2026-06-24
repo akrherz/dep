@@ -59,9 +59,7 @@ def main(scenario: int):
             progress.write(f"Error: {row['filepath']} has no neighbors")
             failed += 1
             continue
-        mydir = wantedfn.parent
-        if not mydir.is_dir():
-            mydir.mkdir(parents=True)
+        wantedfn.parent.mkdir(parents=True, exist_ok=True)
         progress.write(f"Copying {copyfn} to {wantedfn}")
         copyfile(copyfn, wantedfn)
         # Now fix the header to match its location
