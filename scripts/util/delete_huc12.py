@@ -32,6 +32,16 @@ def do_delete(conn, huc12, scenario):
 
     res = conn.execute(
         sql_helper("""
+    delete from field f using huc12 h where
+    f.huc12_id = h.huc12_id and
+    h.huc12_code = :huc12 and f.scenario_id = :scenario
+    """),
+        params,
+    )
+    print(f"removed {res.rowcount} fields")
+
+    res = conn.execute(
+        sql_helper("""
     delete from flowpath p using huc12 h where
     p.huc12_id = h.huc12_id and
     h.huc12_code = :huc12 and p.scenario_id = :scenario
@@ -70,7 +80,7 @@ def do_delete(conn, huc12, scenario):
 @click.option("--scenario", required=True, help="Scenario", type=int)
 def main(huc12: str, scenario: int):
     """Go Main Go"""
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         do_delete(conn, huc12, scenario)
         conn.commit()
 

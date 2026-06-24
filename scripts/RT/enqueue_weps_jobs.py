@@ -85,7 +85,8 @@ def main(
         JOIN climate_file c on (p.climate_file_id = c.climate_file_id)
         JOIN gssurgo g on (o.gssurgo_id = g.gssurgo_id)
         where (h.states ~* 'MN' or h.huc12_code = ANY(:graphhucs))
-        and f.scenario_id = 0 and o.ofe = 1)
+        and f.scenario_id = :scenario_id and p.scenario_id = :scenario_id
+        and o.ofe = 1)
     select field_id, huc12_fpath_num, huc12_code, st_x(pt) as lon,
     st_y(pt) as lat, crop, clifile, mukey from data
     where row_number = 1 and crop in ('C', 'B') {huclimit}
@@ -97,6 +98,7 @@ def main(
                 "graphhucs": GRAPH_HUC12,
                 "hucs": myhucs,
                 "charat": dt.year - 2007 + 1,
+                "scenario_id": scenario,
             },
         )
     if fieldsdf.empty:

@@ -122,12 +122,12 @@ def one():
     df2 = pd.read_sql(
         """
         WITH iahuc12 as (
-            SELECT huc12_code from huc12
+            SELECT huc12_id from huc12
             where states = 'IA' and scenario_id = 0
         )
         SELECT valid, sum(qc_precip_mm) / 25.4 as precip
         from water_results_by_huc12 r
-        JOIN iahuc12 i on (r.huc12_code = i.huc12_code)
+        JOIN iahuc12 i on (r.huc12_id = i.huc12_id)
         WHERE r.scenario_id = 0 and r.valid >= '2014-01-01' and
         r.valid < '2015-01-01' GROUP by valid
       """,

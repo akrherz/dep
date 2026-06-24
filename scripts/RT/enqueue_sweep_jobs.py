@@ -89,6 +89,9 @@ def main(date: datetime, scenario: int, myhucs: str | None, queue: str):
                 "charat": dt.year - 2007 + 1,
             },
         )
+        if fieldsdf.empty:
+            LOG.warning("No fields found for %s, aborting.", dt)
+            return
         # Remove current entries, only for HUC12s of interest!
         dbclean_limit_huc12 = []
         if myhucs:
