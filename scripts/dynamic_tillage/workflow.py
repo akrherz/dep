@@ -131,7 +131,7 @@ def estimate_soiltemp(huc12df: pd.DataFrame, dt: datetime):
                     # The crude GFS may not have a soil temperature at the
                     # given grid cell, so we move left and down to find one.
                     gfs_offset = 0
-                    while gfs_offset < 6 and tmin.mask:
+                    while gfs_offset < 6 and np.ma.is_masked(tmin.mask):
                         if not tmin.mask[y[i] - gfs_offset, x[i] - gfs_offset]:
                             break
                         gfs_offset = gfs_offset + 1

@@ -87,7 +87,7 @@ def job(dates: list[date], tmpdir, huc12: str) -> int:
     huc12df = huc12df.reset_index(drop=True)
 
     reads = 0
-    for flowpath, flowpathdf in huc12df.groupby("fpath"):
+    for flowpath, flowpathdf in huc12df.groupby("huc12_fpath_num"):
         wbfn = f"/i/0/wb/{huc12[:8]}/{huc12[8:]}/{huc12}_{flowpath}.wb"
         if not os.path.isfile(wbfn):
             LOG.info("Missing wb: %s", wbfn)
