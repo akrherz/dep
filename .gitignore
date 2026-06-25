@@ -20,7 +20,7 @@
 **/*.feather
 **/*.zip
 /.vscode
-prj2wepp/wepp/hill.slp
+prj2wepp/wepp/data/slopes/hill.slp
 prj2wepp/wepp/data/managements
 prj2wepp/wepp/runs/p0*
 prj2wepp/tmp**
