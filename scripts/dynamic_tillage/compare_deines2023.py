@@ -37,13 +37,15 @@ def main(year: int, crop: str, district: str):
                 params={"metric": f"{crop} planted", "year": year},
             )
 
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         dep = pd.read_sql(
             sql_helper("""
-    select o.plant, sum(acres), count(*) from fields f, field_operations o,
-    huc12 h WHERE f.field_id = o.field_id and o.year = :year and
+    select o.plant, sum(acres), count(*) from
+    field f JOIN field_operations o on (f.field_id = o.field_id)
+    JOIN huc12 h on (f.huc12_id = h.huc12_id)
+    WHERE o.year = :year and
     substr(f.landuse, :pos, 1) = 'B' and
-    f.huc12 = h.huc_12 and h.scenario = 0 and h.ugc = ANY(:fips)
+    h.scenario_id = 0 and h.ugc = ANY(:fips)
     group by plant order by plant;
                                       """),
             conn,

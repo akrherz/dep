@@ -33,7 +33,7 @@ NON_PLASTIC_SOILS = (
 
 def job(dates: list[date], tmpdir, huc12: str) -> int:
     """Do work for a HUC12"""
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         # Build up cross reference of fields and flowpath/OFEs
         # Dates are currently always for the same year
         huc12df = pd.read_sql(
@@ -46,7 +46,7 @@ def job(dates: list[date], tmpdir, huc12: str) -> int:
     ), toplayer as (
         select mukey, om from layers where rank = 1
     )
-    select o.ofe, p.fpath, f.fbndid,
+    select o.ofe, p.huc12_fpath_num, f.huc12_fbndid_num,
     g.plastic_limit as raw_plastic_limit,
     g.wepp_min_sw1 + (g.wepp_max_sw1 - g.wepp_min_sw1) * 0.5796 as fieldcap58,
     case when
@@ -57,14 +57,15 @@ def job(dates: list[date], tmpdir, huc12: str) -> int:
     else
         g.plastic_limit * 0.8
     end as plastic_limit,
-    p.fpath || '_' || o.ofe as combo, p.huc_12 as huc12,
+    p.huc12_fpath_num || '_' || o.ofe as combo, h.huc12_code as huc12,
     substr(o.landuse, :charat, 1) as crop
     from
     flowpaths p LEFT JOIN flowpath_ofes o on p.fid = o.flowpath
       LEFT JOIN fields f on o.field_id = f.field_id
       LEFT JOIN gssurgo g on o.gssurgo_id = g.id
       LEFT JOIN toplayer tl on g.mukey = tl.mukey::int
-    WHERE p.huc_12 = :huc12 and p.scenario = 0
+      LEFT JOIN huc12 h on f.huc12_id = h.huc12_id
+    WHERE h.huc12_code = :huc12 and p.scenario_id = 0
             """
             ),
             conn,
@@ -120,22 +121,22 @@ def main(dt, huc12, year):
     outdir = f"/mnt/idep2/data/smstate/{dates[0]:%Y}"
     os.makedirs(outdir, exist_ok=True)
 
-    huc12limiter = "" if huc12 is None else " and huc_12 = :huc12"
-    with get_sqlalchemy_conn("idep") as conn:
+    huc12limiter = "" if huc12 is None else " and huc12_code = :huc12"
+    with get_sqlalchemy_conn("dep") as conn:
         huc12df = gpd.read_postgis(
             sql_helper(
                 """
-            SELECT geom, huc_12,
+            SELECT geom, huc12_code,
             ST_x(st_transform(st_centroid(geom), 4326)) as lon,
             ST_y(st_transform(st_centroid(geom), 4326)) as lat
-            from huc12 where scenario = 0 {huc12limiter}
+            from huc12 where scenario_id = 0 {huc12limiter}
             """,
                 huc12limiter=huc12limiter,
             ),
             conn,
             params={"huc12": huc12},
             geom_col="geom",
-            index_col="huc_12",
+            index_col="huc12_code",
         )
     progress = tqdm(total=len(huc12df.index), disable=not os.isatty(1))
     with (

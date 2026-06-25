@@ -80,12 +80,12 @@ def prj2wepp(huc12, fpath):
     return True
 
 
-def do_edit_rotfile(year, huc12, row):
+def do_edit_rotfile(year, huc12: str, row: dict):
     """Edit up our .rot files."""
     yearindex = str(year - 2007 + 1)
     rotfn = (
         f"/i/0/rot/{huc12[:8]}/{huc12[8:]}/"
-        f"{huc12}_{row['fpath']:.0f}_{row['ofe']:.0f}.rot"
+        f"{huc12}_{row['huc12_fpath_num']:.0f}_{row['ofe']:.0f}.rot"
     )
     with open(rotfn, encoding="ascii") as fh:
         lines = fh.readlines()
@@ -110,7 +110,7 @@ def do_edit_rotfile(year, huc12, row):
         fh.write("".join(lines))
 
 
-def estimate_soiltemp(huc12df, dt):
+def estimate_soiltemp(huc12df: pd.DataFrame, dt: datetime):
     """Write mean GFS soil temperature C into huc12df."""
     # Look back from 12z at most 24 hours for a file to use
     z12 = datetime(dt.year, dt.month, dt.day, 12)
@@ -131,7 +131,7 @@ def estimate_soiltemp(huc12df, dt):
                     # The crude GFS may not have a soil temperature at the
                     # given grid cell, so we move left and down to find one.
                     gfs_offset = 0
-                    while gfs_offset < 6:
+                    while gfs_offset < 6 and tmin.mask:
                         if not tmin.mask[y[i] - gfs_offset, x[i] - gfs_offset]:
                             break
                         gfs_offset = gfs_offset + 1
@@ -171,7 +171,7 @@ def estimate_rainfall(huc12df: pd.DataFrame, dt: date):
 def job(arg: list[date, str, bool, bool]):
     """Do the job."""
     dt, huc12, edit_rotfile, run_prj2wepp = arg
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         fields, planted, tilled = do_huc12(conn, 0, dt, huc12)
     # A HUC12 without any C or B, likely
     if not edit_rotfile or "ofe" not in fields.columns:
@@ -201,12 +201,12 @@ def main(scenario, dt, huc12, edr, run_prj2wepp):
     # Deal with dates not datetime
     dt = dt.date()
     LOG.info("Processing %s for scenario %s", dt, scenario)
-    huc12_filter = "" if huc12 is None else " and huc_12 = :huc12"
-    with get_sqlalchemy_conn("idep") as conn:
+    huc12_filter = "" if huc12 is None else " and huc12_code = :huc12"
+    with get_sqlalchemy_conn("dep") as conn:
         huc12df = gpd.read_postgis(
             sql_helper(
                 """
-            SELECT geom, huc_12,
+            SELECT geom, huc12_code,
             false as limited_by_precip,
             false as limited_by_soiltemp,
             false as limited_by_soilmoisture,
@@ -216,14 +216,14 @@ def main(scenario, dt, huc12, edr, run_prj2wepp):
             99.9 as tsoil_max,
             ST_x(st_transform(st_centroid(geom), 4326)) as lon,
             ST_y(st_transform(st_centroid(geom), 4326)) as lat
-            from huc12 where scenario = :scenario {huc12_filter}
+            from huc12 where scenario_id = :scenario {huc12_filter}
             """,
                 huc12_filter=huc12_filter,
             ),
             conn,
             params={"scenario": scenario, "huc12": huc12},
             geom_col="geom",
-            index_col="huc_12",
+            index_col="huc12_code",
         )
     huc12df["tilled"] = pd.NA
     huc12df["planted"] = pd.NA

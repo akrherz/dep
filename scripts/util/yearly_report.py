@@ -21,15 +21,16 @@ def main(argv):
     df = read_sql(
         """
         WITH iahuc12 as (
-            SELECT huc_12 from huc12 where states = %s and scenario = 0
+            SELECT huc12_id from huc12 where states = %s and scenario_id = 0
         ), agg as (
-            SELECT r.huc_12, extract(year from valid)::int as yr,
-            sum(qc_precip) as precip, sum(avg_runoff) as runoff,
-            sum(avg_delivery) as delivery,
-            sum(avg_loss) as detachment from results_by_huc12 r JOIN iahuc12 i
-            on (r.huc_12 = i.huc_12) WHERE r.scenario = %s
+            SELECT r.huc12_id, extract(year from valid)::int as yr,
+            sum(qc_precip_mm) as precip, sum(avg_runoff_mm) as runoff,
+            sum(avg_delivery_kgm2) as delivery,
+            sum(avg_loss_kgm2) as detachment
+            from water_results_by_huc12 r JOIN iahuc12 i
+            on (r.huc12_id = i.huc12_id) WHERE r.scenario_id = %s
             and r.valid >= '2008-01-01'
-            and r.valid <= %s GROUP by r.huc_12, yr
+            and r.valid <= %s GROUP by r.huc12_id, yr
         )
 
         SELECT yr, round((avg(precip) / 25.4)::numeric, 2) as precip_in,
@@ -38,7 +39,7 @@ def main(argv):
         round((avg(detachment) * %s)::numeric, 2) as detachment_ta
         from agg GROUP by yr ORDER by yr
     """,
-        get_dbconnstr("idep"),
+        get_dbconnstr("dep"),
         params=(
             state,
             scenario,
@@ -49,7 +50,7 @@ def main(argv):
         index_col="yr",
     )
 
-    print(df)
+    print(df.to_markdown())
     print(df.mean())
 
     (fig, ax) = plt.subplots(1, 1)

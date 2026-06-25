@@ -12,25 +12,26 @@ from pyiem.plot import MapPlot, figure_axes, get_cmap
 def plot_map_progress(i, dt):
     """Make a map diagnostic."""
     charidx = dt.year - 2007 + 1
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         huc12df = gpd.read_postgis(
             sql_helper("""
             with data as (
-                select huc12, sum(acres) as total,
+                select huc12_id, sum(acres) as total,
                 sum(case when o.plant is not null then acres else 0 end)
-                    as planted from fields f LEFT JOIN field_operations o
+                    as planted from
+                field f LEFT JOIN field_operations o
                 on (f.field_id = o.field_id and o.year = :year and
-                o.plant <= :dt) where scenario = 0 and
-                substr(landuse, :charidx, 1) = 'C' GROUP by huc12
+                o.plant <= :dt) where scenario_id = 0 and
+                substr(landuse, :charidx, 1) = 'C' GROUP by huc12_id
             )
-            select huc_12, ST_Transform(simple_geom, 4326) as geom,
+            select huc12_code, ST_Transform(simple_geom, 4326) as geom,
             total, planted
-            from huc12 h JOIN data d on (h.huc_12 = d.huc12)
-            where scenario = 0
+            from huc12 h JOIN data d on (h.huc12_id = d.huc12_id)
+            where scenario_id = 0
         """),
             conn,
             params={"year": dt.year, "dt": dt, "charidx": charidx},
-            index_col="huc_12",
+            index_col="huc12_code",
             geom_col="geom",
         )
     huc12df["progress"] = huc12df["planted"] / huc12df["total"] * 100.0
@@ -179,14 +180,15 @@ def main():
         title="DEP 102300070305 2007-2022 Accumulated Plant Completion",
     )
 
-    with get_sqlalchemy_conn("idep") as conn:
+    with get_sqlalchemy_conn("dep") as conn:
         df = pd.read_sql(
             """
             select f.acres, o.year, o.plant,
             plant - (o.year || '-03-01')::date as doy
-            from fields f JOIN field_operations o
-            on (f.field_id = o.field_id) WHERE f.huc12 = '102300070305'
-            ORDER by plant asc
+            from field f
+            JOIN field_operations o on (f.field_id = o.field_id)
+            JOIN huc12 h on (h.huc12_id = f.huc12_id)
+            WHERE h.huc12_code = '102300070305' ORDER by plant asc
             """,
             conn,
             parse_dates=["plant"],

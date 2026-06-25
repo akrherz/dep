@@ -34,6 +34,21 @@ def main(argv):
     for row in cursor:
         fn = get_cli_fname(row[0], row[1], clscenario)
         cursor2.execute(
+            """
+    select climate_file_id from climate_file where filepath = %s and
+    scenario_id = %s
+            """,
+            (fn, clscenario),
+        )
+        if cursor2.rowcount == 0:
+            cursor2.execute(
+                """
+    insert into climate_file (scenario_id, filepath, geom)
+    values (%s, %s, st_point(%s, %s, 4326))
+                """,
+                (clscenario, fn, row[0], row[1]),
+            )
+        cursor2.execute(
             "update flowpath SET "
             "climate_file_id = (select climate_file_id from climate_file "
             "where filepath = %s and scenario_id = %s) WHERE flowpath_id = %s",
