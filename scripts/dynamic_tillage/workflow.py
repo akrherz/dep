@@ -50,7 +50,7 @@ def setup_thread():
         )
 
 
-def prj2wepp(huc12, fpath):
+def prj2wepp(huc12: str, fpath: int):
     """Run prj2wepp."""
     mydir = threading.current_thread().tmpdir
     fn = f"/i/0/prj/{huc12[:8]}/{huc12[8:]}/{huc12}_{fpath:.0f}.prj"
@@ -184,7 +184,7 @@ def job(arg: list[date, str, bool, bool]):
     for _, row in fields.iterrows():
         do_edit_rotfile(dt.year, huc12, row)
     if run_prj2wepp and not fields.empty:
-        for fpath in fields["fpath"].unique():
+        for fpath in fields["huc12_fpath_num"].unique():
             prj2wepp(huc12, fpath)
 
     return huc12, planted, tilled
