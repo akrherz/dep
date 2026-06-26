@@ -113,7 +113,7 @@ def generate_runfile(
 #   RFD-UserName
 Exercise 1
 #   FarmId TractId FieldId runtypedisp RotationYears CycleCount
- |  |  | NRCS | 20 | 1
+ |  |  | Date | 20 | 1
 #   RFD-Site
 FIPS:US-WI-097
 #
@@ -248,7 +248,7 @@ def run_weps(payload: WEPSJobPayload) -> None:
             "-e0",  # Don't create all sweep files
             "-H0",  # No heartbeat output
             "-i3",  # temp debuggin
-            "-I2",  # Run the given management cycles, TODO
+            "-I1",  # Run the given management cycles, TODO
             "-n0",  # Don't create new input files
             f"-o{payload.dt:%d%m%Y}",  # Generate SWEEP input on this date
             f"-P{tmpdir}",  # Path to files
