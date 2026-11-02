@@ -42,6 +42,7 @@ def main(alldates: bool, wanteddt: datetime | None):
         )
     progress = tqdm(fieldsdf.itertuples(), total=len(fieldsdf.index))
     inserts = 0
+    today = date.today()
     with get_sqlalchemy_conn("dep") as conn:
         for row in progress:
             progress.set_description(
@@ -64,7 +65,7 @@ def main(alldates: bool, wanteddt: datetime | None):
                     if len(tokens) < 20:
                         continue
                     dt = date(int(tokens[4]), int(tokens[3]), int(tokens[2]))
-                    if dt.year == 2026:  # Don't want these attm
+                    if dt >= today:
                         continue
                     if wanteddt is not None and dt != wanteddt:
                         continue
