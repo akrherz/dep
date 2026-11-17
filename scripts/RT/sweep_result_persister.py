@@ -11,9 +11,9 @@ from pika.exceptions import AMQPConnectionError
 from pyiem.database import get_dbconnc
 
 from dailyerosion.util import get_rabbitmqconn
+from dailyerosion.workflows import QUEUES
 from dailyerosion.workflows.sweeprun import SweepJobResult
 
-RABBITMQ_QUEUE = "sweep_results"
 RECONNECT_DELAY_SECONDS = 5
 
 
@@ -81,11 +81,11 @@ def main():
         try:
             connection, _config = get_rabbitmqconn()
             channel = connection.channel()
-            channel.queue_declare(queue=RABBITMQ_QUEUE, durable=True)
+            channel.queue_declare(queue=QUEUES.SWEEP_RESULTS, durable=True)
             channel.basic_consume(
-                queue=RABBITMQ_QUEUE, on_message_callback=callback
+                queue=QUEUES.SWEEP_RESULTS, on_message_callback=callback
             )
-            queue_name = RABBITMQ_QUEUE
+            queue_name = QUEUES.SWEEP_RESULTS
             print(
                 f"Waiting for messages in '{queue_name}'. "
                 "Press Ctrl+C to exit."

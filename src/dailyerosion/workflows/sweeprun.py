@@ -13,6 +13,8 @@ class SweepJobResult(BaseModel):
     dt: Annotated[date, Field(description="Date of Run")]
     scenario: Annotated[int, Field(description="Scenario ID")]
     erosion: Annotated[float, Field(description="Erosion in kg/m2")]
+    salt_creep: Annotated[float, Field(description="Salt Creep in kg/m2")]
+    pm10: Annotated[float, Field(description="PM10 in kg/m2")]
     max_wmps: Annotated[float, Field(description="Max Wind Speed mps")]
     avg_wmps: Annotated[float, Field(description="Average Wind Speed mps")]
     drct: Annotated[
