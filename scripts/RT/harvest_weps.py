@@ -10,6 +10,9 @@ from pyiem.util import logger
 from tqdm import tqdm
 
 LOG = logger()
+# Threshold for saving wind erosion results based on wind speed (m/s)
+# if there was no erosion
+WIND_SAVE_THRESH = 12.0
 
 
 @click.command()
@@ -42,10 +45,23 @@ def main(alldates: bool, wanteddt: datetime | None):
         )
     progress = tqdm(fieldsdf.itertuples(), total=len(fieldsdf.index))
     inserts = 0
+    files_read = 0
+    today = date.today()
+    day_index = None
+    month_index = None
+    year_index = None
+    loss_index = None
+    max_wind_index = None
+    drct_index = None
+    pm10_index = None
+    pm2_5_index = None
+    suspen_index = None
+    sampled_header = None
     with get_sqlalchemy_conn("dep") as conn:
         for row in progress:
             progress.set_description(
-                f"{row.huc12_code}_{row.huc12_fpath_num:04.0f} {inserts}"
+                f"{row.huc12_code}_{row.huc12_fpath_num:04.0f} {inserts} over "
+                f"{files_read}"
             )
             outfn = (
                 Path("/i/0/weps")
@@ -54,38 +70,68 @@ def main(alldates: bool, wanteddt: datetime | None):
                 / f"{row.huc12_code}_{row.huc12_fpath_num}.out"
             )
             if not outfn.exists():
-                progress.write(f"Missing {outfn}")
+                # Don't really care about not existing output files as inserts
+                # will be sus if lots of files are missing
                 continue
+            files_read += 1
             with open(outfn, "r") as fh:
-                for line in fh:
-                    if line.find("doy") > 0:
+                for linenum, line in enumerate(fh):
+                    if linenum == 0:
+                        header = line.strip()
+                        if sampled_header is None:
+                            sampled_header = header
+                            tokens = [x.strip() for x in header.split("|")]
+                            day_index = tokens.index("day")
+                            month_index = tokens.index("mon")
+                            year_index = tokens.index("yr")
+                            loss_index = tokens.index("tot_loss")
+                            max_wind_index = tokens.index("max_wind")
+                            drct_index = tokens.index("dir_wind")
+                            pm10_index = tokens.index("pm10")
+                            pm2_5_index = tokens.index("pm2_5")
+                            suspen_index = tokens.index("suspen")
+                        if sampled_header != header:
+                            progress.write("Abort has header does not match")
+                            break
                         continue
                     tokens = line.strip().split()
                     if len(tokens) < 20:
                         continue
-                    dt = date(int(tokens[4]), int(tokens[3]), int(tokens[2]))
-                    if dt.year == 2026:  # Don't want these attm
+                    dt = date(
+                        int(tokens[year_index]),
+                        int(tokens[month_index]),
+                        int(tokens[day_index]),
+                    )
+                    if dt >= today:
                         continue
                     if wanteddt is not None and dt != wanteddt:
                         continue
-                    total_loss = float(tokens[5]) * -1.0
-                    if total_loss == 0:
+                    total_loss = float(tokens[loss_index]) * -1.0
+                    max_wmps = float(tokens[max_wind_index])
+                    if total_loss == 0 and max_wmps < WIND_SAVE_THRESH:
                         continue
                     inserts += 1
+                    salt_creep = total_loss - (
+                        float(tokens[suspen_index]) * -1.0
+                    )
                     conn.execute(
                         sql_helper(
                             """
     insert into {table} (field_id, scenario_id, valid,
-    erosion_kgm2, max_wind_speed_mps, drct) values (:fld, 0,
-    :valid, :erosion, :max_wmps, :drct)""",
+    erosion_kgm2, max_wind_speed_mps, drct, pm10_kgm2, pm2_5_kgm2,
+    salt_creep_kgm2) values (:fld, 0,
+    :valid, :erosion, :max_wmps, :drct, :pm10, :pm2_5, :salt)""",
                             table=f"field_wind_erosion_results_{dt.year}",
                         ),
                         {
                             "fld": row.field_id,
                             "valid": dt,
                             "erosion": total_loss,
-                            "max_wmps": float(tokens[9]),
-                            "drct": float(tokens[10]),
+                            "max_wmps": max_wmps,
+                            "drct": float(tokens[drct_index]),
+                            "pm10": max(0, float(tokens[pm10_index]) * -1.0),
+                            "pm2_5": max(0, float(tokens[pm2_5_index]) * -1.0),
+                            "salt": salt_creep,
                         },
                     )
                     if inserts % 1000 == 0:

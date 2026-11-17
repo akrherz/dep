@@ -1,13 +1,13 @@
 [build-system]
 build-backend = "setuptools.build_meta"
-requires = [ "setuptools>=64", "setuptools-scm>=8" ]
+requires = [ "setuptools>=77", "setuptools-scm>=8" ]
 
 [project]
 name = "dailyerosion"
 description = "Daily Erosion Project Python package"
 readme = "README.md"
 keywords = [ "agriculture", "climate", "erosion", "meteorology" ]
-license = { text = "Apache" }
+license = "Apache-2.0"
 requires-python = ">=3.11"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",

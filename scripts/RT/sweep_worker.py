@@ -264,11 +264,15 @@ def run_sweep(tempdir: str, payload: SweepJobPayload) -> SweepJobResult | None:
         tokens = fh.read().strip().split()
         # total soil loss, saltation loss, suspension loss, PM10 loss
         erosion = float(tokens[0])
+        salt_creep = float(tokens[1])
+        pm10 = float(tokens[3])
     return SweepJobResult(
         field_id=payload.field_id,
         dt=payload.dt,
         scenario=payload.scenario,
         erosion=erosion,
+        salt_creep=salt_creep,
+        pm10=pm10,
         max_wmps=max(windobs),
         avg_wmps=sum(windobs) / len(windobs),
         drct=drct,
@@ -279,7 +283,7 @@ def send_result(ch: Channel, payload: str):
     """Send to RabbitMQ, back on the main thread."""
     ch.basic_publish(
         exchange="",
-        routing_key="sweep_results",
+        routing_key=QUEUES.SWEEP_RESULTS,
         body=payload,
     )
 

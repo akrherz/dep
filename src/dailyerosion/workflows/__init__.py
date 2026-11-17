@@ -13,3 +13,4 @@ class QUEUES(StrEnum):
     WEPP = "wepp_v1"
     WEPS = "weps_v4"
     SWEEP = "sweep_v3"
+    SWEEP_RESULTS = "sweep_results_v1"
